@@ -73,33 +73,35 @@ struct ContentView: View {
     @State private var chartCustomizations: [UUID: ChartCustomization] = [:]
     /// Currently customizing this measurement type
     @State private var customizingType: MeasurementType?
-        /// Selected date range filter
-        @State private var selectedDateFilter: DateRangeFilter = .allTime
-        /// Custom start date for filtering
-        @State private var customStartDate: Date = Date()
-        /// Custom end date for filtering
-        @State private var customEndDate: Date = Date()
-        /// Show date range picker sheet
-        @State private var showingDateRangePicker = false
+    /// Selected date range filter
+    @State private var selectedDateFilter: DateRangeFilter = .allTime
+    /// Custom start date for filtering
+    @State private var customStartDate: Date = Date()
+    /// Custom end date for filtering
+    @State private var customEndDate: Date = Date()
+    /// Show date range picker sheet
+    @State private var showingDateRangePicker = false
+    /// Show merged chart view
+    @State private var showingMergedChart = false
     
     // MARK: - Computed Properties
+    
+    /// Filter measurements based on selected date range
+    func filteredMeasurements(for measurements: [Measurement]) -> [Measurement] {
+        let startDate = selectedDateFilter.startDate(customStart: customStartDate)
+        let endDate = selectedDateFilter == .custom ? customEndDate : Date()
         
-        /// Filter measurements based on selected date range
-        func filteredMeasurements(for measurements: [Measurement]) -> [Measurement] {
-            let startDate = selectedDateFilter.startDate(customStart: customStartDate)
-            let endDate = selectedDateFilter == .custom ? customEndDate : Date()
-            
-            if startDate == nil {
-                return measurements // Show all data
-            }
-            
-            return measurements.filter { measurement in
-                guard let start = startDate else { return true }
-                return measurement.timestamp >= start && measurement.timestamp <= endDate
-            }
+        if startDate == nil {
+            return measurements // Show all data
         }
         
-        // MARK: - Body
+        return measurements.filter { measurement in
+            guard let start = startDate else { return true }
+            return measurement.timestamp >= start && measurement.timestamp <= endDate
+        }
+    }
+    
+    // MARK: - Body
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -128,15 +130,15 @@ struct ContentView: View {
                             let customization = chartCustomizations[type.id] ?? ChartCustomization()
                             
                             ChartView(
-                                                            measurementType: type,
-                                                            measurements: filteredMeasurements(for: type.measurements),
-                                                            pointSize: customization.pointSize,
-                                                            pointColor: customization.pointColor,
-                                                            showDataPoints: customization.showDataPoints,
-                                                            showLine: customization.showLine,
-                                                            lineColor: customization.lineColor,
-                                                            lineWidth: customization.lineWidth
-                                                        )
+                                measurementType: type,
+                                measurements: filteredMeasurements(for: type.measurements),
+                                pointSize: customization.pointSize,
+                                pointColor: customization.pointColor,
+                                showDataPoints: customization.showDataPoints,
+                                showLine: customization.showLine,
+                                lineColor: customization.lineColor,
+                                lineWidth: customization.lineWidth
+                            )
                             .background(Color(.systemBackground))
                             .cornerRadius(12)
                             .shadow(radius: 2)
@@ -151,9 +153,9 @@ struct ContentView: View {
                         startDate: selectedDateFilter.startDate(customStart: customStartDate),
                         endDate: selectedDateFilter == .custom ? customEndDate : Date()
                     )
-                        .background(Color(.systemBackground))
-                        .cornerRadius(12)
-                        .shadow(radius: 2)
+                    .background(Color(.systemBackground))
+                    .cornerRadius(12)
+                    .shadow(radius: 2)
                 }
                 .padding()
             }
@@ -181,6 +183,12 @@ struct ContentView: View {
                         } label: {
                             Label("New Measurement Type", systemImage: "chart.line.uptrend.xyaxis")
                         }
+                        
+                        Button {
+                            showingMergedChart = true
+                        } label: {
+                            Label("Merge Charts", systemImage: "square.stack.3d.up")
+                        }
                     } label: {
                         Image(systemName: "plus.circle.fill")
                             .font(.title2)
@@ -194,18 +202,21 @@ struct ContentView: View {
                 AddMeasurementTypeView()
             }
             .sheet(item: $customizingType) { type in
-                            ChartCustomizationWrapper(
-                                type: type,
-                                chartCustomizations: $chartCustomizations
-                            )
-                        }
-                        .sheet(isPresented: $showingDateRangePicker) {
-                            DateRangeFilterView(
-                                selectedFilter: $selectedDateFilter,
-                                customStartDate: $customStartDate,
-                                customEndDate: $customEndDate
-                            )
-                        }
+                ChartCustomizationWrapper(
+                    type: type,
+                    chartCustomizations: $chartCustomizations
+                )
+            }
+            .sheet(isPresented: $showingDateRangePicker) {
+                DateRangeFilterView(
+                    selectedFilter: $selectedDateFilter,
+                    customStartDate: $customStartDate,
+                    customEndDate: $customEndDate
+                )
+            }
+            .sheet(isPresented: $showingMergedChart) {
+                MergedChartView()
+            }
             .onAppear {
                 // Set up initial data (glucose, ketones, weight) with sample measurements
                 DataManager.setupInitialData(context: modelContext)
@@ -246,5 +257,3 @@ extension Color {
         )
     }
 }
-
-// MARK: - Preview
