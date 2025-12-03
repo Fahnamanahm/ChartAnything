@@ -6,8 +6,8 @@
 //
 
 import SwiftUI
-import Charts
 import SwiftData
+import Charts
 
 /// View that automatically calculates and displays GKI (Glucose-Ketone Index)
 /// GKI = Glucose (mg/dL) ÷ (Ketones (mmol/L) × 18)
@@ -18,7 +18,19 @@ struct GKICalculatorView: View {
     @Query private var measurements: [Measurement]
     @Query private var measurementTypes: [MeasurementType]
     
+    // MARK: - Date Filtering
+    let startDate: Date?
+    let endDate: Date
+    
     // MARK: - Computed Properties
+    
+    /// Filter measurements by date range
+    var filteredMeasurements: [Measurement] {
+        if let start = startDate {
+            return measurements.filter { $0.timestamp >= start && $0.timestamp <= endDate }
+        }
+        return measurements
+    }
     
     /// Find the Glucose measurement type
     var glucoseType: MeasurementType? {
@@ -38,9 +50,9 @@ struct GKICalculatorView: View {
             return []
         }
         
-        // Get glucose and ketone measurements
-        let glucoseMeasurements = measurements.filter { $0.measurementType?.id == glucoseType.id }
-        let ketoneMeasurements = measurements.filter { $0.measurementType?.id == ketonesType.id }
+        // Get glucose and ketone measurements (filtered by date)
+        let glucoseMeasurements = filteredMeasurements.filter { $0.measurementType?.id == glucoseType.id }
+        let ketoneMeasurements = filteredMeasurements.filter { $0.measurementType?.id == ketonesType.id }
         
         var results: [(date: Date, gki: Double)] = []
         let calendar = Calendar.current
@@ -160,10 +172,4 @@ struct GKIChartView: View {
             }
         }
     }
-}
-
-// MARK: - Preview
-#Preview {
-    GKICalculatorView()
-        .modelContainer(for: [MeasurementType.self, Measurement.self], inMemory: true)
 }

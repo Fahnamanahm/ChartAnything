@@ -73,16 +73,53 @@ struct ContentView: View {
     @State private var chartCustomizations: [UUID: ChartCustomization] = [:]
     /// Currently customizing this measurement type
     @State private var customizingType: MeasurementType?
+        /// Selected date range filter
+        @State private var selectedDateFilter: DateRangeFilter = .allTime
+        /// Custom start date for filtering
+        @State private var customStartDate: Date = Date()
+        /// Custom end date for filtering
+        @State private var customEndDate: Date = Date()
+        /// Show date range picker sheet
+        @State private var showingDateRangePicker = false
     
-    // MARK: - Body
+    // MARK: - Computed Properties
+        
+        /// Filter measurements based on selected date range
+        func filteredMeasurements(for measurements: [Measurement]) -> [Measurement] {
+            let startDate = selectedDateFilter.startDate(customStart: customStartDate)
+            let endDate = selectedDateFilter == .custom ? customEndDate : Date()
+            
+            if startDate == nil {
+                return measurements // Show all data
+            }
+            
+            return measurements.filter { measurement in
+                guard let start = startDate else { return true }
+                return measurement.timestamp >= start && measurement.timestamp <= endDate
+            }
+        }
+        
+        // MARK: - Body
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 20) {
                     // MARK: App Title
-                    Text("ChartAnything")
-                        .font(.largeTitle)
-                        .bold()
+                    HStack {
+                        Text("ChartAnything")
+                            .font(.largeTitle)
+                            .bold()
+                        
+                        Spacer()
+                        
+                        Button {
+                            showingDateRangePicker = true
+                        } label: {
+                            Image(systemName: "calendar")
+                                .font(.title2)
+                                .foregroundStyle(.blue)
+                        }
+                    }
                     
                     // MARK: Charts Display
                     // Show a chart for each measurement type that has data
@@ -91,15 +128,15 @@ struct ContentView: View {
                             let customization = chartCustomizations[type.id] ?? ChartCustomization()
                             
                             ChartView(
-                                measurementType: type,
-                                measurements: type.measurements,
-                                pointSize: customization.pointSize,
-                                pointColor: customization.pointColor,
-                                showDataPoints: customization.showDataPoints,
-                                showLine: customization.showLine,
-                                lineColor: customization.lineColor,
-                                lineWidth: customization.lineWidth
-                            )
+                                                            measurementType: type,
+                                                            measurements: filteredMeasurements(for: type.measurements),
+                                                            pointSize: customization.pointSize,
+                                                            pointColor: customization.pointColor,
+                                                            showDataPoints: customization.showDataPoints,
+                                                            showLine: customization.showLine,
+                                                            lineColor: customization.lineColor,
+                                                            lineWidth: customization.lineWidth
+                                                        )
                             .background(Color(.systemBackground))
                             .cornerRadius(12)
                             .shadow(radius: 2)
@@ -110,7 +147,10 @@ struct ContentView: View {
                     }
                     // MARK: GKI Calculator
                     // Show GKI chart if both glucose and ketones exist
-                    GKICalculatorView()
+                    GKICalculatorView(
+                        startDate: selectedDateFilter.startDate(customStart: customStartDate),
+                        endDate: selectedDateFilter == .custom ? customEndDate : Date()
+                    )
                         .background(Color(.systemBackground))
                         .cornerRadius(12)
                         .shadow(radius: 2)
@@ -154,11 +194,18 @@ struct ContentView: View {
                 AddMeasurementTypeView()
             }
             .sheet(item: $customizingType) { type in
-                ChartCustomizationWrapper(
-                    type: type,
-                    chartCustomizations: $chartCustomizations
-                )
-            }
+                            ChartCustomizationWrapper(
+                                type: type,
+                                chartCustomizations: $chartCustomizations
+                            )
+                        }
+                        .sheet(isPresented: $showingDateRangePicker) {
+                            DateRangeFilterView(
+                                selectedFilter: $selectedDateFilter,
+                                customStartDate: $customStartDate,
+                                customEndDate: $customEndDate
+                            )
+                        }
             .onAppear {
                 // Set up initial data (glucose, ketones, weight) with sample measurements
                 DataManager.setupInitialData(context: modelContext)
