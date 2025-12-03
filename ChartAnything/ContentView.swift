@@ -8,6 +8,51 @@
 import SwiftUI
 import SwiftData
 
+/// Holds customization settings for a single chart
+struct ChartCustomization {
+    var pointSize: Double = 8
+    var pointColor: Color = .blue
+    var showDataPoints: Bool = true
+    var showLine: Bool = true
+    var lineColor: Color = .blue
+    var lineWidth: Double = 2
+}
+
+/// Wrapper to handle dictionary binding for chart customization
+struct ChartCustomizationWrapper: View {
+    let type: MeasurementType
+    @Binding var chartCustomizations: [UUID: ChartCustomization]
+    
+    var body: some View {
+        ChartCustomizationView(
+            measurementType: type,
+            pointSize: binding(\.pointSize),
+            pointColor: binding(\.pointColor),
+            showDataPoints: binding(\.showDataPoints),
+            showLine: binding(\.showLine),
+            lineColor: binding(\.lineColor),
+            lineWidth: binding(\.lineWidth)
+        )
+    }
+    
+    private func binding<T>(_ keyPath: WritableKeyPath<ChartCustomization, T>) -> Binding<T> {
+        Binding(
+            get: {
+                if let customization = chartCustomizations[type.id] {
+                    return customization[keyPath: keyPath]
+                } else {
+                    return ChartCustomization()[keyPath: keyPath]
+                }
+            },
+            set: { newValue in
+                var customization = chartCustomizations[type.id] ?? ChartCustomization()
+                customization[keyPath: keyPath] = newValue
+                chartCustomizations[type.id] = customization
+            }
+        )
+    }
+}
+
 /// Main view of the app - displays all charts and provides access to add measurements
 struct ContentView: View {
     // MARK: - Environment
@@ -24,6 +69,10 @@ struct ContentView: View {
     @State private var showingAddMeasurement = false
     /// Controls whether the "Add Measurement Type" sheet is shown
     @State private var showingAddMeasurementType = false
+    /// Track customization settings for each measurement type
+    @State private var chartCustomizations: [UUID: ChartCustomization] = [:]
+    /// Currently customizing this measurement type
+    @State private var customizingType: MeasurementType?
     
     // MARK: - Body
     var body: some View {
@@ -39,16 +88,24 @@ struct ContentView: View {
                     // Show a chart for each measurement type that has data
                     ForEach(measurementTypes, id: \.id) { type in
                         if !type.measurements.isEmpty {
+                            let customization = chartCustomizations[type.id] ?? ChartCustomization()
+                            
                             ChartView(
                                 measurementType: type,
                                 measurements: type.measurements,
-                                useEmoji: false,
-                                emojiSymbol: type.emoji,
-                                lineColor: Color(hex: type.colorHex) ?? .blue
+                                pointSize: customization.pointSize,
+                                pointColor: customization.pointColor,
+                                showDataPoints: customization.showDataPoints,
+                                showLine: customization.showLine,
+                                lineColor: customization.lineColor,
+                                lineWidth: customization.lineWidth
                             )
                             .background(Color(.systemBackground))
                             .cornerRadius(12)
                             .shadow(radius: 2)
+                            .onTapGesture {
+                                customizingType = type
+                            }
                         }
                     }
                     // MARK: GKI Calculator
@@ -60,6 +117,14 @@ struct ContentView: View {
                 }
                 .padding()
             }
+            .background(
+                LinearGradient(
+                    colors: [Color.purple.opacity(0.3), Color.blue.opacity(0.2)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                .ignoresSafeArea()
+            )
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 // MARK: Add Menu
@@ -87,6 +152,12 @@ struct ContentView: View {
             }
             .sheet(isPresented: $showingAddMeasurementType) {
                 AddMeasurementTypeView()
+            }
+            .sheet(item: $customizingType) { type in
+                ChartCustomizationWrapper(
+                    type: type,
+                    chartCustomizations: $chartCustomizations
+                )
             }
             .onAppear {
                 // Set up initial data (glucose, ketones, weight) with sample measurements
@@ -130,7 +201,3 @@ extension Color {
 }
 
 // MARK: - Preview
-#Preview {
-    ContentView()
-        .modelContainer(for: [MeasurementType.self, Measurement.self, ChartConfiguration.self], inMemory: true)
-}
