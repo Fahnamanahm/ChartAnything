@@ -134,6 +134,44 @@ struct ContentView: View {
                 showingImportAlert = true
             }
         }
+            
+            /// Import CSV data from clipboard
+            private func importFromClipboard() {
+                // Get clipboard content
+                guard let clipboardText = UIPasteboard.general.string else {
+                    importMessage = "No text found in clipboard"
+                    showingImportAlert = true
+                    return
+                }
+                
+                // Write to temporary file
+                let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("clipboard_import.csv")
+                
+                do {
+                    try clipboardText.write(to: tempURL, atomically: true, encoding: .utf8)
+                    
+                    // Import from temporary file
+                    let importResult = CSVManager.importFromCSV(
+                        fileURL: tempURL,
+                        context: modelContext,
+                        measurementTypes: measurementTypes
+                    )
+                    
+                    if importResult.errors > 0 {
+                        importMessage = "Import completed with issues:\n\n✓ \(importResult.success) measurements imported\n✗ \(importResult.errors) failed\n\nErrors:\n\(importResult.messages.joined(separator: "\n"))"
+                    } else {
+                        importMessage = "Success! Imported \(importResult.success) measurements from clipboard!"
+                    }
+                    showingImportAlert = true
+                    
+                    // Clean up temp file
+                    try? FileManager.default.removeItem(at: tempURL)
+                    
+                } catch {
+                    importMessage = "Failed to process clipboard data: \(error.localizedDescription)"
+                    showingImportAlert = true
+                }
+            }
         
         // MARK: - Computed Properties
     
@@ -249,11 +287,21 @@ struct ContentView: View {
                                                         Label("Export Data", systemImage: "square.and.arrow.up")
                                                     }
                                                     
-                                                    Button {
-                                                        showingImportPicker = true
-                                                    } label: {
-                                                        Label("Import Data", systemImage: "square.and.arrow.down")
-                                                    }
+                        Menu {
+                                                Button {
+                                                    showingImportPicker = true
+                                                } label: {
+                                                    Label("Import from File", systemImage: "doc")
+                                                }
+                                                
+                                                Button {
+                                                    importFromClipboard()
+                                                } label: {
+                                                    Label("Import from Clipboard", systemImage: "doc.on.clipboard")
+                                                }
+                                            } label: {
+                                                Label("Import Data", systemImage: "square.and.arrow.down")
+                                            }
                                                 } label: {
                                                     Image(systemName: "plus.circle.fill")
                                                         .font(.title2)
@@ -294,15 +342,15 @@ struct ContentView: View {
                         }
                         .fileImporter(
                             isPresented: $showingImportPicker,
-                            allowedContentTypes: [.commaSeparatedText],
+                            allowedContentTypes: [.item],
                             allowsMultipleSelection: false
                         ) { result in
                             handleImport(result: result)
                         }
-            .onAppear {
-                // Set up initial data (glucose, ketones, weight) with sample measurements
-                DataManager.setupInitialData(context: modelContext)
-            }
+                        .onAppear {
+                                        // Initial data setup disabled - import your own data instead
+                                        // DataManager.setupInitialData(context: modelContext)
+                                    }
         }
     }
 }
