@@ -7,6 +7,7 @@
 
 import SwiftUI
 import SwiftData
+import UniformTypeIdentifiers
 
 /// Holds customization settings for a single chart
 struct ChartCustomization {
@@ -83,8 +84,58 @@ struct ContentView: View {
     @State private var showingDateRangePicker = false
     /// Show merged chart view
     @State private var showingMergedChart = false
+        /// Show import file picker
+        @State private var showingImportPicker = false
+    /// URL for sharing exported CSV
+        @State private var shareURL: URL?
+    /// Show export success alert
+        @State private var showingExportAlert = false
+        @State private var exportMessage = ""
+        /// Show import result alert
+        @State private var showingImportAlert = false
+        @State private var importMessage = ""
     
-    // MARK: - Computed Properties
+    // MARK: - Methods
+        
+    /// Export all measurements to CSV file
+        private func exportData() {
+            guard let url = CSVManager.exportToCSV(measurements: measurements, measurementTypes: measurementTypes) else {
+                exportMessage = "Failed to create CSV file"
+                showingExportAlert = true
+                return
+            }
+            
+            let fileName = url.lastPathComponent
+            exportMessage = "Data exported successfully!\n\nFile saved to:\nFiles app > On My iPhone > ChartAnything > \(fileName)"
+            showingExportAlert = true
+        }
+        
+    /// Handle CSV import from file picker
+        private func handleImport(result: Result<[URL], Error>) {
+            switch result {
+            case .success(let urls):
+                guard let url = urls.first else { return }
+                
+                let importResult = CSVManager.importFromCSV(
+                    fileURL: url,
+                    context: modelContext,
+                    measurementTypes: measurementTypes
+                )
+                
+                if importResult.errors > 0 {
+                    importMessage = "Import completed with issues:\n\n✓ \(importResult.success) measurements imported\n✗ \(importResult.errors) failed\n\nErrors:\n\(importResult.messages.joined(separator: "\n"))"
+                } else {
+                    importMessage = "Success! Imported \(importResult.success) measurements."
+                }
+                showingImportAlert = true
+                
+            case .failure(let error):
+                importMessage = "Import failed: \(error.localizedDescription)"
+                showingImportAlert = true
+            }
+        }
+        
+        // MARK: - Computed Properties
     
     /// Filter measurements based on selected date range
     func filteredMeasurements(for measurements: [Measurement]) -> [Measurement] {
@@ -188,10 +239,24 @@ struct ContentView: View {
                             showingMergedChart = true
                         } label: {
                             Label("Merge Charts", systemImage: "square.stack.3d.up")
-                        }
-                    } label: {
-                        Image(systemName: "plus.circle.fill")
-                            .font(.title2)
+                                                    }
+                                                    
+                                                    Divider()
+                                                    
+                                                    Button {
+                                                        exportData()
+                                                    } label: {
+                                                        Label("Export Data", systemImage: "square.and.arrow.up")
+                                                    }
+                                                    
+                                                    Button {
+                                                        showingImportPicker = true
+                                                    } label: {
+                                                        Label("Import Data", systemImage: "square.and.arrow.down")
+                                                    }
+                                                } label: {
+                                                    Image(systemName: "plus.circle.fill")
+                                                        .font(.title2)
                     }
                 }
             }
@@ -215,14 +280,43 @@ struct ContentView: View {
                 )
             }
             .sheet(isPresented: $showingMergedChart) {
-                MergedChartView()
-            }
+                            MergedChartView()
+                        }
+            .alert("Export Data", isPresented: $showingExportAlert) {
+                            Button("OK") { }
+                        } message: {
+                            Text(exportMessage)
+                        }
+                        .alert("Import Data", isPresented: $showingImportAlert) {
+                            Button("OK") { }
+                        } message: {
+                            Text(importMessage)
+                        }
+                        .fileImporter(
+                            isPresented: $showingImportPicker,
+                            allowedContentTypes: [.commaSeparatedText],
+                            allowsMultipleSelection: false
+                        ) { result in
+                            handleImport(result: result)
+                        }
             .onAppear {
                 // Set up initial data (glucose, ketones, weight) with sample measurements
                 DataManager.setupInitialData(context: modelContext)
             }
         }
     }
+}
+
+// MARK: - Share Sheet
+/// UIKit share sheet wrapper for SwiftUI
+struct ShareSheet: UIViewControllerRepresentable {
+    let url: URL
+    
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: [url], applicationActivities: nil)
+    }
+    
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }
 
 // MARK: - Color Extension
