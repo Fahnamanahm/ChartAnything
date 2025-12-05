@@ -44,6 +44,7 @@ struct GKICalculatorView: View {
     
     /// Get all GKI calculations from paired glucose/ketone measurements
     /// Groups measurements by day and calculates GKI for each day
+    /// Filters out GKI values > 9.0
     var gkiData: [(date: Date, gki: Double)] {
         guard let glucoseType = glucoseType,
               let ketonesType = ketonesType else {
@@ -70,7 +71,11 @@ struct GKICalculatorView: View {
                     glucose: glucoseMeasurement.value,
                     ketones: ketone.value
                 )
-                results.append((date: glucoseMeasurement.timestamp, gki: gki))
+                
+                // Only include GKI values <= 9.0
+                if gki <= 9.0 {
+                    results.append((date: glucoseMeasurement.timestamp, gki: gki))
+                }
             }
         }
         
@@ -105,22 +110,49 @@ struct GKICalculatorView: View {
     }
 }
 
-/// Chart view specifically for displaying GKI data
+/// Chart view specifically for displaying GKI data with tap-to-view functionality
 struct GKIChartView: View {
     let gkiData: [(date: Date, gki: Double)]
     
+    // MARK: Chart Selection State
+    @State private var selectedDate: Date?
+    
+    /// Find the GKI data point closest to the selected date
+    var selectedDataPoint: (date: Date, gki: Double)? {
+        guard let selectedDate = selectedDate else { return nil }
+        return gkiData.min(by: { abs($0.date.timeIntervalSince(selectedDate)) < abs($1.date.timeIntervalSince(selectedDate)) })
+    }
+    
     var body: some View {
-        VStack(alignment: .leading) {
-            // GKI interpretation guide
-            HStack(spacing: 15) {
-                gkiLegendItem(color: .green, range: "< 3", meaning: "Therapeutic")
-                gkiLegendItem(color: .yellow, range: "3-6", meaning: "Moderate")
-                gkiLegendItem(color: .orange, range: "6-9", meaning: "Low")
-                gkiLegendItem(color: .red, range: "> 9", meaning: "High")
+        VStack(alignment: .leading, spacing: 8) {
+            // MARK: Legend and Selected Value Display
+            HStack {
+                // Updated GKI interpretation guide
+                VStack(alignment: .leading, spacing: 4) {
+                    gkiLegendItem(color: .green, text: "Therapeutic ketosis: 0.5 to 1.0")
+                    gkiLegendItem(color: .yellow, text: "High ketosis: 1.01 to 3.0")
+                    gkiLegendItem(color: .orange, text: "Moderate ketosis: 3.01 to 6.0")
+                    gkiLegendItem(color: .red, text: "Low ketosis: 6.01 to 9.0")
+                }
+                .font(.caption2)
+                
+                Spacer()
+                
+                // Show selected GKI value when tapping chart
+                if let selected = selectedDataPoint {
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text("GKI: \(selected.gki, specifier: "%.2f")")
+                            .font(.caption)
+                            .bold()
+                            .foregroundStyle(gkiColor(for: selected.gki))
+                        Text(selected.date, format: .dateTime.month().day())
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
             }
-            .font(.caption2)
             
-            // Chart display
+            // Chart display with fixed Y-axis range
             Chart(gkiData, id: \.date) { item in
                 LineMark(
                     x: .value("Date", item.date),
@@ -134,6 +166,17 @@ struct GKIChartView: View {
                     y: .value("GKI", item.gki)
                 )
                 .foregroundStyle(gkiColor(for: item.gki))
+                
+                // Highlight selected point
+                if let selectedDataPoint = selectedDataPoint,
+                   selectedDataPoint.date == item.date {
+                    PointMark(
+                        x: .value("Date", item.date),
+                        y: .value("GKI", item.gki)
+                    )
+                    .foregroundStyle(gkiColor(for: item.gki))
+                    .symbolSize(100)
+                }
             }
             .frame(height: 200)
             .chartXAxis {
@@ -142,34 +185,36 @@ struct GKIChartView: View {
                 }
             }
             .chartYAxis {
-                AxisMarks(position: .leading)
+                AxisMarks(position: .leading, values: [1, 3, 6, 9]) {
+                    AxisGridLine()
+                    AxisValueLabel()
+                }
             }
+            .chartYScale(domain: 0.5...9.0)
+            .chartXSelection(value: $selectedDate)
         }
     }
     
     // MARK: - Helper Methods
     
-    /// Returns color based on GKI value ranges
+    /// Returns color based on updated GKI value ranges
     private func gkiColor(for gki: Double) -> Color {
         switch gki {
-        case ..<3: return .green      // Therapeutic ketosis
-        case 3..<6: return .yellow    // Moderate
-        case 6..<9: return .orange    // Low ketosis
-        default: return .red          // High (not in ketosis)
+        case 0.5...1.0: return .green      // Therapeutic ketosis
+        case 1.01...3.0: return .yellow    // High ketosis
+        case 3.01...6.0: return .orange    // Moderate ketosis
+        case 6.01...9.0: return .red       // Low ketosis
+        default: return .gray              // Outside range (shouldn't happen with filtering)
         }
     }
     
-    /// Creates a legend item showing GKI range and interpretation
-    private func gkiLegendItem(color: Color, range: String, meaning: String) -> some View {
+    /// Creates a legend item with colored dot and text
+    private func gkiLegendItem(color: Color, text: String) -> some View {
         HStack(spacing: 4) {
             Circle()
                 .fill(color)
                 .frame(width: 8, height: 8)
-            VStack(alignment: .leading, spacing: 0) {
-                Text(range)
-                    .bold()
-                Text(meaning)
-            }
+            Text(text)
         }
     }
 }
