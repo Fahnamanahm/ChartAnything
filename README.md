@@ -1,4 +1,10 @@
-# ChartAnything
+![iOS](https://img.shields.io/badge/iOS-17.0+-blue)
+![Swift](https://img.shields.io/badge/Swift-5.9-orange)
+![SwiftUI](https://img.shields.io/badge/SwiftUI-✓-green)
+
+**Current Version: 1.0.0** • Released: December 5, 2025
+
+## ✨ Features# ChartAnything
 
 A powerful iOS health tracking app with highly customizable data visualization. Track any health metric with beautiful, interactive charts and automatic GKI (Glucose-Ketone Index) calculation.
 
