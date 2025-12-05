@@ -40,16 +40,13 @@ class CSVManager {
             csvText += "\(date),\(time),\(typeName),\(value),\(unit),\(notes)\n"
         }
         
-        // Write to Documents directory so user can access via Files app
+        // Save to temporary directory for sharing
                 let fileName = "ChartAnything_Export_\(dateFormatter.string(from: Date())).csv"
-                guard let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
-                    return nil
-                }
-                let fileURL = documentsURL.appendingPathComponent(fileName)
+                let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(fileName)
         
         do {
-                    try csvText.write(to: fileURL, atomically: true, encoding: .utf8)
-                    return fileURL
+                    try csvText.write(to: tempURL, atomically: true, encoding: .utf8)
+                    return tempURL
         } catch {
             print("Error writing CSV: \(error)")
             return nil

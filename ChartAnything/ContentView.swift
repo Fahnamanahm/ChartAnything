@@ -90,23 +90,46 @@ struct ContentView: View {
         @State private var shareURL: URL?
     /// Show export success alert
         @State private var showingExportAlert = false
+        /// Show share sheet for export
+        @State private var showingExportShare = false
         @State private var exportMessage = ""
         /// Show import result alert
         @State private var showingImportAlert = false
-        @State private var importMessage = ""
+    @State private var importMessage = ""
+        /// Show delete warning alerts
+        @State private var showingDeleteWarning = false
+        @State private var showingFinalDeleteWarning = false
     
     // MARK: - Methods
         
-    /// Export all measurements to CSV file
+    /// Export all measurements to clipboard as CSV
         private func exportData() {
-            guard let url = CSVManager.exportToCSV(measurements: measurements, measurementTypes: measurementTypes) else {
-                exportMessage = "Failed to create CSV file"
-                showingExportAlert = true
-                return
+            // Create CSV text directly
+            var csvText = "Date,Time,Measurement Type,Value,Unit,Notes\n"
+            
+            let dateFormatter = DateFormatter()
+            dateFormatter.dateFormat = "yyyy-MM-dd"
+            
+            let timeFormatter = DateFormatter()
+            timeFormatter.dateFormat = "HH:mm:ss"
+            
+            for measurement in measurements.sorted(by: { $0.timestamp < $1.timestamp }) {
+                guard let type = measurement.measurementType else { continue }
+                
+                let date = dateFormatter.string(from: measurement.timestamp)
+                let time = timeFormatter.string(from: measurement.timestamp)
+                let typeName = type.name.replacingOccurrences(of: ",", with: ";")
+                let value = String(measurement.value)
+                let unit = type.unit.replacingOccurrences(of: ",", with: ";")
+                let notes = (measurement.notes ?? "").replacingOccurrences(of: ",", with: ";")
+                
+                csvText += "\(date),\(time),\(typeName),\(value),\(unit),\(notes)\n"
             }
             
-            let fileName = url.lastPathComponent
-            exportMessage = "Data exported successfully!\n\nFile saved to:\nFiles app > On My iPhone > ChartAnything > \(fileName)"
+            // Copy to clipboard
+            UIPasteboard.general.string = csvText
+            
+            exportMessage = "Export successful!\n\n\(measurements.count) measurements copied to clipboard as CSV.\n\nYou can now paste into Notes, Mail, or any text app."
             showingExportAlert = true
         }
         
@@ -135,43 +158,59 @@ struct ContentView: View {
             }
         }
             
-            /// Import CSV data from clipboard
-            private func importFromClipboard() {
-                // Get clipboard content
-                guard let clipboardText = UIPasteboard.general.string else {
-                    importMessage = "No text found in clipboard"
-                    showingImportAlert = true
-                    return
-                }
-                
-                // Write to temporary file
-                let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("clipboard_import.csv")
-                
-                do {
-                    try clipboardText.write(to: tempURL, atomically: true, encoding: .utf8)
-                    
-                    // Import from temporary file
-                    let importResult = CSVManager.importFromCSV(
-                        fileURL: tempURL,
-                        context: modelContext,
-                        measurementTypes: measurementTypes
-                    )
-                    
-                    if importResult.errors > 0 {
-                        importMessage = "Import completed with issues:\n\n✓ \(importResult.success) measurements imported\n✗ \(importResult.errors) failed\n\nErrors:\n\(importResult.messages.joined(separator: "\n"))"
-                    } else {
-                        importMessage = "Success! Imported \(importResult.success) measurements from clipboard!"
-                    }
-                    showingImportAlert = true
-                    
-                    // Clean up temp file
-                    try? FileManager.default.removeItem(at: tempURL)
-                    
-                } catch {
-                    importMessage = "Failed to process clipboard data: \(error.localizedDescription)"
-                    showingImportAlert = true
-                }
+    /// Import CSV data from clipboard
+        private func importFromClipboard() {
+            // Get clipboard content
+            guard let clipboardText = UIPasteboard.general.string else {
+                importMessage = "No text found in clipboard"
+                showingImportAlert = true
+                return
             }
+            
+            // Write to temporary file
+            let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("clipboard_import.csv")
+            
+            do {
+                try clipboardText.write(to: tempURL, atomically: true, encoding: .utf8)
+                
+                // Import from temporary file
+                let importResult = CSVManager.importFromCSV(
+                    fileURL: tempURL,
+                    context: modelContext,
+                    measurementTypes: measurementTypes
+                )
+                
+                if importResult.errors > 0 {
+                    importMessage = "Import completed with issues:\n\n✓ \(importResult.success) measurements imported\n✗ \(importResult.errors) failed\n\nErrors:\n\(importResult.messages.joined(separator: "\n"))"
+                } else {
+                    importMessage = "Success! Imported \(importResult.success) measurements from clipboard!"
+                }
+                showingImportAlert = true
+                
+                // Clean up temp file
+                try? FileManager.default.removeItem(at: tempURL)
+                
+            } catch {
+                importMessage = "Failed to process clipboard data: \(error.localizedDescription)"
+                showingImportAlert = true
+            }
+        }
+        
+        /// Delete all measurement data
+        private func deleteAllData() {
+            // Delete all measurements
+            for measurement in measurements {
+                modelContext.delete(measurement)
+            }
+            
+            // Delete all measurement types
+            for type in measurementTypes {
+                modelContext.delete(type)
+            }
+            
+            // Save context
+            try? modelContext.save()
+        }
         
         // MARK: - Computed Properties
     
@@ -258,58 +297,66 @@ struct ContentView: View {
             )
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                // MARK: Add Menu
-                ToolbarItem(placement: .primaryAction) {
-                    Menu {
-                        Button {
-                            showingAddMeasurement = true
-                        } label: {
-                            Label("Add Measurement", systemImage: "plus.circle")
+                            // MARK: Add Menu
+                            ToolbarItem(placement: .primaryAction) {
+                                Menu {
+                                    Button {
+                                        showingAddMeasurement = true
+                                    } label: {
+                                        Label("Add Measurement", systemImage: "plus.circle")
+                                    }
+                                    
+                                    Button {
+                                        showingAddMeasurementType = true
+                                    } label: {
+                                        Label("New Measurement Type", systemImage: "chart.line.uptrend.xyaxis")
+                                    }
+                                    
+                                    Button {
+                                        showingMergedChart = true
+                                    } label: {
+                                        Label("Merge Charts", systemImage: "square.stack.3d.up")
+                                    }
+                                    
+                                    Divider()
+                                    
+                                    Button {
+                                        exportData()
+                                    } label: {
+                                        Label("Export Data", systemImage: "square.and.arrow.up")
+                                    }
+                                    
+                                    Menu {
+                                        Button {
+                                            showingImportPicker = true
+                                        } label: {
+                                            Label("Import from File", systemImage: "doc")
+                                        }
+                                        
+                                        Button {
+                                            importFromClipboard()
+                                        } label: {
+                                            Label("Import from Clipboard", systemImage: "doc.on.clipboard")
+                                        }
+                                    } label: {
+                                        Label("Import Data", systemImage: "square.and.arrow.down")
+                                    }
+                                    
+                                    Divider()
+                                    
+                                    Button(role: .destructive) {
+                                        showingDeleteWarning = true
+                                    } label: {
+                                        Label("Delete All Data", systemImage: "trash")
+                                    }
+                                } label: {
+                                    Image(systemName: "plus.circle.fill")
+                                        .font(.title2)
+                                }
+                            }
                         }
-                        
-                        Button {
-                            showingAddMeasurementType = true
-                        } label: {
-                            Label("New Measurement Type", systemImage: "chart.line.uptrend.xyaxis")
-                        }
-                        
-                        Button {
-                            showingMergedChart = true
-                        } label: {
-                            Label("Merge Charts", systemImage: "square.stack.3d.up")
-                                                    }
-                                                    
-                                                    Divider()
-                                                    
-                                                    Button {
-                                                        exportData()
-                                                    } label: {
-                                                        Label("Export Data", systemImage: "square.and.arrow.up")
-                                                    }
-                                                    
-                        Menu {
-                                                Button {
-                                                    showingImportPicker = true
-                                                } label: {
-                                                    Label("Import from File", systemImage: "doc")
-                                                }
-                                                
-                                                Button {
-                                                    importFromClipboard()
-                                                } label: {
-                                                    Label("Import from Clipboard", systemImage: "doc.on.clipboard")
-                                                }
-                                            } label: {
-                                                Label("Import Data", systemImage: "square.and.arrow.down")
-                                            }
-                                                } label: {
-                                                    Image(systemName: "plus.circle.fill")
-                                                        .font(.title2)
-                    }
-                }
-            }
-            .sheet(isPresented: $showingAddMeasurement) {
-                AddMeasurementView()
+                        .sheet(isPresented: $showingAddMeasurement) {
+                            AddMeasurementView()
             }
             .sheet(isPresented: $showingAddMeasurementType) {
                 AddMeasurementTypeView()
@@ -336,10 +383,27 @@ struct ContentView: View {
                             Text(exportMessage)
                         }
                         .alert("Import Data", isPresented: $showingImportAlert) {
-                            Button("OK") { }
-                        } message: {
-                            Text(importMessage)
-                        }
+                                        Button("OK") { }
+                                    } message: {
+                                        Text(importMessage)
+                                    }
+                                    .alert("⚠️ WARNING", isPresented: $showingDeleteWarning) {
+                                        Button("Cancel", role: .cancel) { }
+                                        Button("Continue", role: .destructive) {
+                                            showingFinalDeleteWarning = true
+                                        }
+                                    } message: {
+                                        Text("This will permanently delete ALL your health data. Are you sure?")
+                                    }
+                                    .alert("🚨 NO REALLY", isPresented: $showingFinalDeleteWarning) {
+                                        Button("Cancel", role: .cancel) { }
+                                        Button("Delete Everything", role: .destructive) {
+                                            deleteAllData()
+                                        }
+                                    } message: {
+                                        Text("This cannot be undone. All measurements will be lost forever. Delete everything?")
+                                    }
+                                   
                         .fileImporter(
                             isPresented: $showingImportPicker,
                             allowedContentTypes: [.item],
@@ -355,13 +419,18 @@ struct ContentView: View {
     }
 }
 
-// MARK: - Share Sheet
+// MARK: - Activity View Controller
 /// UIKit share sheet wrapper for SwiftUI
-struct ShareSheet: UIViewControllerRepresentable {
-    let url: URL
+struct ActivityViewController: UIViewControllerRepresentable {
+    let activityItems: [Any]
+    let applicationActivities: [UIActivity]? = nil
     
     func makeUIViewController(context: Context) -> UIActivityViewController {
-        UIActivityViewController(activityItems: [url], applicationActivities: nil)
+        let controller = UIActivityViewController(
+            activityItems: activityItems,
+            applicationActivities: applicationActivities
+        )
+        return controller
     }
     
     func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
