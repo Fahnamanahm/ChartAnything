@@ -30,18 +30,23 @@ struct ChartView: View {
         measurements.sorted { $0.timestamp < $1.timestamp }
     }
     
-    /// Calculate Y-axis range with fixed 10-unit padding above and below
-    var yAxisRange: (min: Double, max: Double) {
-        guard !sortedMeasurements.isEmpty else {
-            return (0, 100)
+    /// Calculate Y-axis range with smart padding (20% of range, minimum 2 units, floor at 0)
+        var yAxisRange: (min: Double, max: Double) {
+            guard !sortedMeasurements.isEmpty else {
+                return (0, 100)
+            }
+            
+            let values = sortedMeasurements.map { $0.value }
+            let minValue = values.min() ?? 0
+            let maxValue = values.max() ?? 100
+            
+            // Calculate 20% padding with minimum of 2 units
+            let range = maxValue - minValue
+            let padding = max(range * 0.2, 2.0)
+            
+            // Never go below 0, add padding above
+            return (min: max(0, minValue - padding), max: maxValue + padding)
         }
-        
-        let values = sortedMeasurements.map { $0.value }
-        let minValue = values.min() ?? 0
-        let maxValue = values.max() ?? 100
-        
-        return (min: minValue - 10, max: maxValue + 10)
-    }
     
     /// Find the measurement closest to the selected date
     var selectedMeasurement: Measurement? {
