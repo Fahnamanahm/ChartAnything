@@ -25,20 +25,21 @@ struct MergedChartView: View {
     @Environment(\.dismiss) private var dismiss
     
     @Query private var measurementTypes: [MeasurementType]
-    @Query private var measurements: [Measurement]
-    
-    @State private var selectedTypes: [UUID] = []
-    @State private var measurementConfigs: [UUID: MergedMeasurementConfig] = [:]
-    @State private var expandedTypes: Set<UUID> = []
-    @State private var selectedDateFilter: DateRangeFilter = .allTime
-    @State private var customStartDate: Date = Date()
-    @State private var customEndDate: Date = Date()
-    @State private var showingDateRangePicker = false
+        @Query private var measurements: [Measurement]
+        @Query private var savedCustomizations: [ChartCustomizationModel]
+        
+        @State private var selectedTypes: [UUID] = []
+        @State private var measurementConfigs: [UUID: MergedMeasurementConfig] = [:]
+        @State private var expandedTypes: Set<UUID> = []
+        @State private var selectedDateFilter: DateRangeFilter = .allTime
+        @State private var customStartDate: Date = Date()
+        @State private var customEndDate: Date = Date()
+        @State private var showingDateRangePicker = false
     
     /// Filter measurements by selected date range
     func filteredMeasurements(for measurements: [Measurement]) -> [Measurement] {
         let startDate = selectedDateFilter.startDate(customStart: customStartDate)
-        let endDate = selectedDateFilter == .custom ? customEndDate : Date()
+        let endDate = selectedDateFilter.endDate(customEnd: customEndDate)
         
         if startDate == nil {
             return measurements
@@ -68,57 +69,72 @@ struct MergedChartView: View {
                     }
                     
                     VStack(alignment: .leading, spacing: 10) {
-                        Text("Select Measurements to Merge")
-                            .font(.headline)
-                            .padding(.horizontal)
-                        
-                        ForEach(measurementTypes.filter { !$0.measurements.isEmpty }, id: \.id) { type in
-                            Button {
-                                if selectedTypes.contains(type.id) {
-                                    selectedTypes.removeAll { $0 == type.id }
-                                } else {
-                                    selectedTypes.append(type.id)
-                                    let color = Color(hex: type.colorHex) ?? .blue
-                                    measurementConfigs[type.id] = MergedMeasurementConfig(
-                                        lineColor: color,
-                                        pointColor: color
-                                    )
-                                }
-                            } label: {
-                                HStack {
-                                    Image(systemName: selectedTypes.contains(type.id) ? "checkmark.circle.fill" : "circle")
-                                    Text(type.name)
-                                    Spacer()
-                                }
-                                .padding()
-                            }
-                        }
-                    }
+                                            Text("Select Measurements to Merge")
+                                                .font(.headline)
+                                                .padding(.horizontal)
+                                            
+                                            ForEach(measurementTypes.filter { !$0.measurements.isEmpty }, id: \.id) { type in
+                                                Button {
+                                                    if selectedTypes.contains(type.id) {
+                                                        selectedTypes.removeAll { $0 == type.id }
+                                                    } else {
+                                                        selectedTypes.append(type.id)
+                                                        
+                                                        // Load saved customization or use defaults
+                                                        if let saved = savedCustomizations.first(where: { $0.measurementTypeID == type.id }) {
+                                                            measurementConfigs[type.id] = MergedMeasurementConfig(
+                                                                showLine: saved.showLine,
+                                                                lineColor: Color(hex: saved.lineColorHex) ?? .blue,
+                                                                lineWidth: saved.lineWidth,
+                                                                showPoints: saved.showDataPoints,
+                                                                pointColor: Color(hex: saved.pointColorHex) ?? .blue,
+                                                                pointSize: saved.pointSize
+                                                            )
+                                                        } else {
+                                                            // Fall back to measurement type color
+                                                            let color = Color(hex: type.colorHex) ?? .blue
+                                                            measurementConfigs[type.id] = MergedMeasurementConfig(
+                                                                lineColor: color,
+                                                                pointColor: color
+                                                            )
+                                                        }
+                                                    }
+                                                } label: {
+                                                    HStack {
+                                                        Image(systemName: selectedTypes.contains(type.id) ? "checkmark.circle.fill" : "circle")
+                                                        Text(type.name)
+                                                        Spacer()
+                                                    }
+                                                    .padding()
+                                                }
+                                            }
+                                        }
                     
                     if selectedTypes.count == 2 {
-                        let type1 = measurementTypes.first { $0.id == selectedTypes[0] }!
-                        let type2 = measurementTypes.first { $0.id == selectedTypes[1] }!
-                        let allM1 = measurements.filter { $0.measurementType?.id == selectedTypes[0] }
-                        let allM2 = measurements.filter { $0.measurementType?.id == selectedTypes[1] }
+                                            let type1 = measurementTypes.first { $0.id == selectedTypes[0] }!
+                                            let type2 = measurementTypes.first { $0.id == selectedTypes[1] }!
+                                            let allM1 = measurements.filter { $0.measurementType?.id == selectedTypes[0] }
+                                            let allM2 = measurements.filter { $0.measurementType?.id == selectedTypes[1] }
                         let m1 = filteredMeasurements(for: allM1)
-                        let m2 = filteredMeasurements(for: allM2)
-                        
-                        DualAxisChart(
-                            measurements1: m1,
-                            measurements2: m2,
-                            type1: type1,
-                            type2: type2,
-                            config1: measurementConfigs[selectedTypes[0]] ?? MergedMeasurementConfig(),
-                            config2: measurementConfigs[selectedTypes[1]] ?? MergedMeasurementConfig()
-                        )
-                        .padding()
-                    } else if selectedTypes.count > 2 {
-                        Text("Select exactly 2 measurements for now")
-                            .foregroundStyle(.secondary)
-                            .padding()
-                    }
-                }
-            }
+                                                                    let m2 = filteredMeasurements(for: allM2)
+                                                                    
+                                                                    DualAxisChart(
+                                                                        measurements1: m1,
+                                                                        measurements2: m2,
+                                                                        type1: type1,
+                                                                        type2: type2,
+                                                                        config1: measurementConfigs[selectedTypes[0]] ?? MergedMeasurementConfig(),
+                                                                        config2: measurementConfigs[selectedTypes[1]] ?? MergedMeasurementConfig()
+                                                                    )
+                                                                    .padding()
+                                                                } else if selectedTypes.count > 2 {
+                                                                    Text("Select exactly 2 measurements for now")
+                                                                        .foregroundStyle(.secondary)
+                                                                        .padding()
+                                                                }
+                                                            }
+                                                            .id(UUID()) // Force complete rebuild
+                                                        }
             .navigationTitle("Merge Charts")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -126,15 +142,16 @@ struct MergedChartView: View {
                 }
             }
             .sheet(isPresented: $showingDateRangePicker) {
-                DateRangeFilterView(
-                    selectedFilter: $selectedDateFilter,
-                    customStartDate: $customStartDate,
-                    customEndDate: $customEndDate
-                )
+                            DateRangeFilterView(
+                                selectedFilter: $selectedDateFilter,
+                                customStartDate: $customStartDate,
+                                customEndDate: $customEndDate
+                            )
+                        }
+                        .id("\(selectedDateFilter.rawValue)-\(customStartDate)-\(customEndDate)")
+                    }
+                }
             }
-        }
-    }
-}
 
 /// Dual Y-axis chart with normalized values and proper scaling
 struct DualAxisChart: View {
