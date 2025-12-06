@@ -57,13 +57,15 @@ struct ChartCustomizationWrapper: View {
 /// Main view of the app - displays all charts and provides access to add measurements
 struct ContentView: View {
     // MARK: - Environment
-    @Environment(\.modelContext) private var modelContext
-    
-    // MARK: - Queries
-    /// Fetch all measurement types from database
-    @Query private var measurementTypes: [MeasurementType]
-    /// Fetch all measurements from database
-    @Query private var measurements: [Measurement]
+        @Environment(\.modelContext) private var modelContext
+        
+        // MARK: - Queries
+        /// Fetch all measurement types from database
+        @Query private var measurementTypes: [MeasurementType]
+        /// Fetch all measurements from database
+        @Query private var measurements: [Measurement]
+        /// Fetch all chart customizations from database
+        @Query private var savedCustomizations: [ChartCustomizationModel]
     
     // MARK: - State Properties
     /// Controls whether the "Add Measurement" sheet is shown
@@ -215,19 +217,19 @@ struct ContentView: View {
         // MARK: - Computed Properties
     
     /// Filter measurements based on selected date range
-    func filteredMeasurements(for measurements: [Measurement]) -> [Measurement] {
-        let startDate = selectedDateFilter.startDate(customStart: customStartDate)
-        let endDate = selectedDateFilter == .custom ? customEndDate : Date()
-        
-        if startDate == nil {
-            return measurements // Show all data
+        func filteredMeasurements(for measurements: [Measurement]) -> [Measurement] {
+            let startDate = selectedDateFilter.startDate(customStart: customStartDate)
+            let endDate = selectedDateFilter.endDate(customEnd: customEndDate)
+            
+            if startDate == nil {
+                return measurements // Show all data
+            }
+            
+            return measurements.filter { measurement in
+                guard let start = startDate else { return true }
+                return measurement.timestamp >= start && measurement.timestamp <= endDate
+            }
         }
-        
-        return measurements.filter { measurement in
-            guard let start = startDate else { return true }
-            return measurement.timestamp >= start && measurement.timestamp <= endDate
-        }
-    }
     
     // MARK: - Body
     var body: some View {
@@ -276,17 +278,17 @@ struct ContentView: View {
                         }
                     }
                     // MARK: GKI Calculator
-                    // Show GKI chart if both glucose and ketones exist
-                    GKICalculatorView(
-                        startDate: selectedDateFilter.startDate(customStart: customStartDate),
-                        endDate: selectedDateFilter == .custom ? customEndDate : Date()
-                    )
-                    .background(Color(.systemBackground))
-                    .cornerRadius(12)
-                    .shadow(radius: 2)
-                }
-                .padding()
-            }
+                                        // Show GKI chart if both glucose and ketones exist
+                                        GKICalculatorView(
+                                            startDate: selectedDateFilter.startDate(customStart: customStartDate),
+                                            endDate: selectedDateFilter.endDate(customEnd: customEndDate)
+                                        )
+                                        .background(Color(.systemBackground))
+                                        .cornerRadius(12)
+                                        .shadow(radius: 2)
+                                    }
+                                    .padding()
+                                }
             .background(
                 LinearGradient(
                     colors: [Color.purple.opacity(0.3), Color.blue.opacity(0.2)],
@@ -358,17 +360,19 @@ struct ContentView: View {
                         .sheet(isPresented: $showingAddMeasurement) {
                             AddMeasurementView()
             }
-            .sheet(isPresented: $showingAddMeasurementType) {
-                AddMeasurementTypeView()
-            }
-            .sheet(item: $customizingType) { type in
-                ChartCustomizationWrapper(
-                    type: type,
-                    chartCustomizations: $chartCustomizations
-                )
-            }
-            .sheet(isPresented: $showingDateRangePicker) {
-                DateRangeFilterView(
+                        .sheet(isPresented: $showingAddMeasurementType) {
+                                        AddMeasurementTypeView()
+                                    }
+                                    .sheet(item: $customizingType) { type in
+                                        ChartCustomizationWrapper(
+                                            type: type,
+                                            chartCustomizations: $chartCustomizations
+                                        )
+                                        .onDisappear {
+                                            saveCustomizations()
+                                        }
+                                    }
+                                    .sheet(isPresented: $showingDateRangePicker) {                DateRangeFilterView(
                     selectedFilter: $selectedDateFilter,
                     customStartDate: $customStartDate,
                     customEndDate: $customEndDate
@@ -401,23 +405,55 @@ struct ContentView: View {
                                             deleteAllData()
                                         }
                                     } message: {
-                                        Text("This cannot be undone. All measurements will be lost forever. Delete everything?")
+                                                                            Text("This cannot be undone. All measurements will be lost forever. Delete everything?")
+                                                                        }
+                                                                       
+                                                            .fileImporter(
+                                                                isPresented: $showingImportPicker,
+                                                                allowedContentTypes: [.item],
+                                                                allowsMultipleSelection: false
+                                                            ) { result in
+                                                                handleImport(result: result)
+                                                            }
+                                                            .onAppear {
+                                                                loadCustomizations()
+                                                            }
+                                                            
+                                            }
+                                        }
+                                        
+                                        // MARK: - Customization Persistence
+                                        
+                                        /// Load saved customizations from database
+                                        private func loadCustomizations() {
+                                            for saved in savedCustomizations {
+                                                chartCustomizations[saved.measurementTypeID] = saved.toChartCustomization()
+                                            }
+                                        }
+                                        
+                                        /// Save customizations to database
+                                        private func saveCustomizations() {
+                                            for (typeID, customization) in chartCustomizations {
+                                                // Find existing saved customization or create new one
+                                                if let existing = savedCustomizations.first(where: { $0.measurementTypeID == typeID }) {
+                                                    existing.update(from: customization)
+                                                } else {
+                                                    let newCustomization = ChartCustomizationModel(
+                                                        measurementTypeID: typeID,
+                                                        pointSize: customization.pointSize,
+                                                        pointColorHex: customization.pointColor.toHex() ?? "007AFF",
+                                                        showDataPoints: customization.showDataPoints,
+                                                        showLine: customization.showLine,
+                                                        lineColorHex: customization.lineColor.toHex() ?? "007AFF",
+                                                        lineWidth: customization.lineWidth
+                                                    )
+                                                    modelContext.insert(newCustomization)
+                                                }
+                                            }
+                                            
+                                            try? modelContext.save()
+                                        }
                                     }
-                                   
-                        .fileImporter(
-                            isPresented: $showingImportPicker,
-                            allowedContentTypes: [.item],
-                            allowsMultipleSelection: false
-                        ) { result in
-                            handleImport(result: result)
-                        }
-                        .onAppear {
-                                        // Initial data setup disabled - import your own data instead
-                                        // DataManager.setupInitialData(context: modelContext)
-                                    }
-        }
-    }
-}
 
 // MARK: - Activity View Controller
 /// UIKit share sheet wrapper for SwiftUI

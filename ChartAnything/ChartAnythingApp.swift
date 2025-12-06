@@ -14,7 +14,8 @@ struct ChartAnythingApp: App {
         let schema = Schema([
             MeasurementType.self,
             Measurement.self,
-            ChartConfiguration.self
+            ChartConfiguration.self,
+            ChartCustomizationModel.self
         ])
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 

@@ -30,9 +30,27 @@ enum DateRangeFilter: String, CaseIterable, Identifiable {
         case .last90Days:
             return calendar.date(byAdding: .day, value: -90, to: now)
         case .custom:
-            return customStart
+            // Set to start of day (midnight)
+            return customStart.map { calendar.startOfDay(for: $0) }
         case .allTime:
             return nil // nil means no filter
+        }
+    }
+    
+    /// Calculate the end date with time set to 11:59:59 PM
+    func endDate(customEnd: Date?) -> Date {
+        let calendar = Calendar.current
+        
+        switch self {
+        case .custom:
+            // Set to end of day (11:59:59 PM)
+            if let customEnd = customEnd {
+                return calendar.date(bySettingHour: 23, minute: 59, second: 59, of: customEnd) ?? customEnd
+            }
+            return Date()
+        default:
+            // For preset ranges, use current time
+            return Date()
         }
     }
 }
