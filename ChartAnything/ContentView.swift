@@ -19,6 +19,49 @@ struct ChartCustomization {
     var lineWidth: Double = 2
 }
 
+// ┌─────────────────────────────────────────────────────────────────┐
+// │ CHART HEADER COMPONENT                                          │
+// │ Shows measurement name with customize and add-reading buttons   │
+// └─────────────────────────────────────────────────────────────────┘
+// ┌─────────────────────────────────────────────────────────────────┐
+// │ CHART HEADER COMPONENT                                          │
+// │ Shows measurement name with customize and add-reading buttons   │
+// │ Just clean text and icon buttons                                │
+// └─────────────────────────────────────────────────────────────────┘
+struct ChartHeaderView: View {
+    let type: MeasurementType
+    let onCustomize: () -> Void
+    let onAddReading: () -> Void
+    
+    var body: some View {
+        HStack {
+            // ↓↓↓ Just show the measurement name (no emoji)
+            Text(type.name)
+                .font(.headline)
+            
+            Spacer()
+            
+            // ↓↓↓ Customize button (blue sliders icon)
+            Button(action: onCustomize) {
+                Image(systemName: "slider.horizontal.3")
+                    .foregroundStyle(.blue)
+                    .font(.title3)
+            }
+            .buttonStyle(.plain)
+            
+            // ↓↓↓ Quick add button (green plus icon)
+            Button(action: onAddReading) {
+                Image(systemName: "plus.circle.fill")
+                    .foregroundStyle(.green)
+                    .font(.title3)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal)
+        .padding(.top, 8)
+    }
+}
+
 /// Wrapper to handle dictionary binding for chart customization
 struct ChartCustomizationWrapper: View {
     let type: MeasurementType
@@ -76,32 +119,33 @@ struct ContentView: View {
     @State private var chartCustomizations: [UUID: ChartCustomization] = [:]
     /// Currently customizing this measurement type
     @State private var customizingType: MeasurementType?
-    /// Selected date range filter
-    @State private var selectedDateFilter: DateRangeFilter = .allTime
-    /// Custom start date for filtering
-    @State private var customStartDate: Date = Date()
-    /// Custom end date for filtering
-    @State private var customEndDate: Date = Date()
-    /// Show date range picker sheet
+        /// Track which measurement type is selected for quick-add
+        @State private var selectedMeasurementTypeForQuickAdd: MeasurementType?
+        /// Selected date range filter
+        @State private var selectedDateFilter: DateRangeFilter = .allTime
+        /// Custom start date for filtering
+        @State private var customStartDate: Date = Date()
+        /// Custom end date for filtering
+        @State private var customEndDate: Date = Date()
+        /// Show date range picker sheet
     @State private var showingDateRangePicker = false
-    /// Show merged chart view
-    @State private var showingMergedChart = false
+        /// Show merged chart view
+        @State private var showingMergedChart = false
         /// Show import file picker
         @State private var showingImportPicker = false
-    /// URL for sharing exported CSV
+        /// URL for sharing exported CSV
         @State private var shareURL: URL?
-    /// Show export success alert
+        /// Show export success alert
         @State private var showingExportAlert = false
         /// Show share sheet for export
         @State private var showingExportShare = false
         @State private var exportMessage = ""
         /// Show import result alert
         @State private var showingImportAlert = false
-    @State private var importMessage = ""
+        @State private var importMessage = ""
         /// Show delete warning alerts
         @State private var showingDeleteWarning = false
         @State private var showingFinalDeleteWarning = false
-    
     // MARK: - Methods
         
     /// Export all measurements to clipboard as CSV
@@ -253,31 +297,51 @@ struct ContentView: View {
                         }
                     }
                     
-                    // MARK: Charts Display
-                    // Show a chart for each measurement type that has data
-                    ForEach(measurementTypes, id: \.id) { type in
-                        if !type.measurements.isEmpty {
-                            let customization = chartCustomizations[type.id] ?? ChartCustomization()
-                            
-                            ChartView(
-                                measurementType: type,
-                                measurements: filteredMeasurements(for: type.measurements),
-                                pointSize: customization.pointSize,
-                                pointColor: customization.pointColor,
-                                showDataPoints: customization.showDataPoints,
-                                showLine: customization.showLine,
-                                lineColor: customization.lineColor,
-                                lineWidth: customization.lineWidth
-                            )
-                            .background(Color(.systemBackground))
-                            .cornerRadius(12)
-                            .shadow(radius: 2)
-                            .onTapGesture {
-                                customizingType = type
-                            }
-                        }
-                    }
-                    // MARK: GKI Calculator
+                    // ┌─────────────────────────────────────────────────────────────────┐
+                    // │ CHARTS DISPLAY SECTION                                          │
+                    // │ Shows one chart for each measurement type that has data         │
+                    // │ Each chart now has customize and add-reading buttons            │
+                    // └─────────────────────────────────────────────────────────────────┘
+                                        // MARK: Charts Display
+                                        ForEach(measurementTypes, id: \.id) { type in
+                                            if !type.measurements.isEmpty {
+                                                let customization = chartCustomizations[type.id] ?? ChartCustomization()
+                                                
+                                                // ↓↓↓ VStack wraps the chart title + buttons and the chart itself
+                                                VStack(alignment: .leading, spacing: 8) {
+                                                    
+                                                    // ┌─────────────────────────────────────────────┐
+                                                    // │ CHART HEADER with title and action buttons  │
+                                                                                                        // └─────────────────────────────────────────────┘
+                                                                                                        ChartHeaderView(
+                                                                                                            type: type,
+                                                                                                            onCustomize: { customizingType = type },
+                                                                                                            onAddReading: {
+                                                                                                                selectedMeasurementTypeForQuickAdd = type
+                                                                                                                showingAddMeasurement = true
+                                                                                                            }
+                                                                                                        )
+                                                                                                        
+                                                                                                        // ↓↓↓ The actual chart display
+                                                                                                        ChartView(
+                                                                                                            measurementType: type,
+                                                                                                            measurements: filteredMeasurements(for: type.measurements),
+                                                                                                            pointSize: customization.pointSize,
+                                                                                                            pointColor: customization.pointColor,
+                                                                                                            showDataPoints: customization.showDataPoints,
+                                                                                                            showLine: customization.showLine,
+                                                                                                            lineColor: customization.lineColor,
+                                                                                                            lineWidth: customization.lineWidth
+                                                                                                        )
+                                                                                                    }
+                                                                                                    .background(Color(.systemBackground))
+                                                                                                    .cornerRadius(12)
+                                                                                                    .shadow(radius: 2)
+                                                                                                }
+                                                                                            }
+                                                                                            // ↑↑↑ END OF CHARTS DISPLAY ↑↑↑
+                                        
+                                        // MARK: GKI Calculator
                                         // Show GKI chart if both glucose and ketones exist
                                         GKICalculatorView(
                                             startDate: selectedDateFilter.startDate(customStart: customStartDate),
@@ -357,22 +421,36 @@ struct ContentView: View {
                                 }
                             }
                         }
-                        .sheet(isPresented: $showingAddMeasurement) {
-                            AddMeasurementView()
-            }
+            // ┌─────────────────────────────────────────────────────────────────┐
+            // │ SHEET 1: Add Measurement (two modes)                            │
+            // │ - If selectedMeasurementTypeForQuickAdd exists = use QuickAdd   │
+            // │ - Otherwise = use full AddMeasurementView                       │
+            // └─────────────────────────────────────────────────────────────────┘
+            .sheet(isPresented: $showingAddMeasurement) {
+                            if let selectedType = selectedMeasurementTypeForQuickAdd {
+                                // ↓↓↓ Quick add - locked to specific measurement type
+                                QuickAddMeasurementView(measurementType: selectedType)
+                                    .onDisappear {
+                                        selectedMeasurementTypeForQuickAdd = nil  // Clear selection
+                                    }
+                            } else {
+                                // ↓↓↓ Full add - user can pick any measurement type
+                                AddMeasurementView()
+                            }
+                        }
                         .sheet(isPresented: $showingAddMeasurementType) {
-                                        AddMeasurementTypeView()
-                                    }
-                                    .sheet(item: $customizingType) { type in
-                                        ChartCustomizationWrapper(
-                                            type: type,
-                                            chartCustomizations: $chartCustomizations
-                                        )
-                                        .onDisappear {
-                                            saveCustomizations()
-                                        }
-                                    }
-                                    .sheet(isPresented: $showingDateRangePicker) {                DateRangeFilterView(
+                            AddMeasurementTypeView()
+                        }
+                        .sheet(item: $customizingType) { type in
+                            ChartCustomizationWrapper(
+                                type: type,
+                                chartCustomizations: $chartCustomizations
+                            )
+                            .onDisappear {
+                                saveCustomizations()
+                            }
+                        }
+            .sheet(isPresented: $showingDateRangePicker) {                DateRangeFilterView(
                     selectedFilter: $selectedDateFilter,
                     customStartDate: $customStartDate,
                     customEndDate: $customEndDate

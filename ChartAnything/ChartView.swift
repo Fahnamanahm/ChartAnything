@@ -56,26 +56,26 @@ struct ChartView: View {
     
     var body: some View {
         VStack(alignment: .leading) {
-            // MARK: Chart Title and Selected Value Display
-            HStack {
-                Text(measurementType.name)
-                    .font(.headline)
-                
-                Spacer()
-                
-                // Show selected value when tapping chart
-                if let selected = selectedMeasurement {
-                    VStack(alignment: .trailing, spacing: 2) {
-                        Text("\(selected.value, specifier: "%.1f") \(measurementType.unit)")
-                            .font(.caption)
-                            .bold()
-                            .foregroundStyle(lineColor)
-                        Text(selected.timestamp, format: .dateTime.month().day().hour().minute())
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
+                    // ┌─────────────────────────────────────────────────────────────┐
+                    // │ SELECTED VALUE DISPLAY (when tapping chart)                │
+                    // │ Title removed - now shown in ChartHeaderView               │
+                    // └─────────────────────────────────────────────────────────────┘
+                    HStack {
+                        Spacer()
+                        
+                        // ↓↓↓ Show selected value when user taps on chart
+                        if let selected = selectedMeasurement {
+                            VStack(alignment: .trailing, spacing: 2) {
+                                Text("\(selected.value, specifier: "%.1f") \(measurementType.unit)")
+                                    .font(.caption)
+                                    .bold()
+                                    .foregroundStyle(lineColor)
+                                Text(selected.timestamp, format: .dateTime.month().day().hour().minute())
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
                     }
-                }
-            }
             
             // MARK: Chart Display
             Chart(sortedMeasurements) { measurement in
