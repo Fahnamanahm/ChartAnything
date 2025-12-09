@@ -275,17 +275,55 @@ struct ContentView: View {
             }
         }
     
-    // MARK: - Body
-    var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: 20) {
-                    // MARK: App Title
-                    HStack {
-                        Text("ChartAnything")
-                            .font(.largeTitle)
-                            .bold()
-                        
+    // ┌─────────────────────────────────────────────────────────────────┐
+    // │ MAIN APP BODY - TAB NAVIGATION                                  │
+    // │ Three tabs: Charts, Add Data, Settings                          │
+    // └─────────────────────────────────────────────────────────────────┘
+        // MARK: - Body
+        var body: some View {
+            TabView {
+                // ┌─────────────────────────────────────────────────────┐
+                // │ TAB 1: CHARTS VIEW                                  │
+                // │ Shows all your measurement charts                   │
+                // └─────────────────────────────────────────────────────┘
+                chartsView
+                    .tabItem {
+                        Label("Charts", systemImage: "chart.line.uptrend.xyaxis")
+                    }
+                
+                // ┌─────────────────────────────────────────────────────┐
+                // │ TAB 2: ADD DATA VIEW                                │
+                // │ Quick entry screen for adding measurements          │
+                // └─────────────────────────────────────────────────────┘
+                addDataView
+                    .tabItem {
+                        Label("Add Data", systemImage: "plus.circle.fill")
+                    }
+                
+                // ┌─────────────────────────────────────────────────────┐
+                // │ TAB 3: SETTINGS VIEW                                │
+                // │ App settings, export/import, etc.                   │
+                // └─────────────────────────────────────────────────────┘
+                settingsView
+                    .tabItem {
+                        Label("Settings", systemImage: "gearshape.fill")
+                    }
+            }
+        }
+        
+        // ┌─────────────────────────────────────────────────────────────┐
+        // │ CHARTS VIEW (Tab 1)                                          │
+        // │ The main charts display - what used to be the whole app     │
+        // └─────────────────────────────────────────────────────────────┘
+        private var chartsView: some View {
+            NavigationStack {
+                ScrollView {
+                    VStack(spacing: 20) {
+                        // MARK: App Title
+                        HStack {
+                            Text("ChartAnything")
+                                .font(.largeTitle)
+                                .bold()
                         Spacer()
                         
                         Button {
@@ -494,20 +532,64 @@ struct ContentView: View {
                                                                 handleImport(result: result)
                                                             }
                                                             .onAppear {
-                                                                loadCustomizations()
-                                                            }
-                                                            
-                                            }
-                                        }
-                                        
-                                        // MARK: - Customization Persistence
-                                        
-                                        /// Load saved customizations from database
-                                        private func loadCustomizations() {
-                                            for saved in savedCustomizations {
-                                                chartCustomizations[saved.measurementTypeID] = saved.toChartCustomization()
-                                            }
-                                        }
+                                                                                        loadCustomizations()
+                                                                                    }
+                                                                    }
+                                                                }
+                                                                
+                                                                // ┌─────────────────────────────────────────────────────────────┐
+                                                                // │ ADD DATA VIEW (Tab 2)                                        │
+                                                                // │ Quick entry screen for adding new measurements              │
+                                                                // └─────────────────────────────────────────────────────────────┘
+                                                                private var addDataView: some View {
+                                                                    NavigationStack {
+                                                                        VStack(spacing: 20) {
+                                                                            Text("Add Data")
+                                                                                .font(.largeTitle)
+                                                                                .bold()
+                                                                                .padding()
+                                                                            
+                                                                            Text("Quick entry coming soon!")
+                                                                                .foregroundStyle(.secondary)
+                                                                            
+                                                                            Spacer()
+                                                                        }
+                                                                        .navigationTitle("Add Data")
+                                                                        .navigationBarTitleDisplayMode(.inline)
+                                                                    }
+                                                                }
+                                                                
+                                                                // ┌─────────────────────────────────────────────────────────────┐
+                                                                // │ SETTINGS VIEW (Tab 3)                                        │
+                                                                // │ App settings, export/import, delete data, etc.              │
+                                                                // └─────────────────────────────────────────────────────────────┘
+                                                                private var settingsView: some View {
+                                                                    NavigationStack {
+                                                                        VStack(spacing: 20) {
+                                                                            Text("Settings")
+                                                                                .font(.largeTitle)
+                                                                                .bold()
+                                                                                .padding()
+                                                                            
+                                                                            Text("Settings coming soon!")
+                                                                                .foregroundStyle(.secondary)
+                                                                            
+                                                                            Spacer()
+                                                                        }
+                                                                        .navigationTitle("Settings")
+                                                                        .navigationBarTitleDisplayMode(.inline)
+                                                                    }
+                                                                }
+                                                                
+                                                                // MARK: - Customization Persistence
+                                                                
+                                                                /// Load saved customizations from database
+                                                                private func loadCustomizations() {
+                                                                    for saved in savedCustomizations {
+                                                                        chartCustomizations[saved.measurementTypeID] = saved.toChartCustomization()
+                                                                    }
+                                                                }
+
                                         
                                         /// Save customizations to database
                                         private func saveCustomizations() {
