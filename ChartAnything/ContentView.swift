@@ -315,227 +315,258 @@ struct ContentView: View {
         // │ CHARTS VIEW (Tab 1)                                          │
         // │ The main charts display - what used to be the whole app     │
         // └─────────────────────────────────────────────────────────────┘
-        private var chartsView: some View {
+    private var chartsView: some View {
             NavigationStack {
-                ScrollView {
-                    VStack(spacing: 20) {
-                        // MARK: App Title
-                        HStack {
-                            Text("ChartAnything")
-                                .font(.largeTitle)
-                                .bold()
-                        Spacer()
-                        
-                        Button {
-                            showingDateRangePicker = true
-                        } label: {
-                            Image(systemName: "calendar")
-                                .font(.title2)
-                                .foregroundStyle(.blue)
+                chartsScrollView
+                    .background(chartBackground)
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .primaryAction) {
+                            toolbarMenu
                         }
                     }
-                    
-                    // ┌─────────────────────────────────────────────────────────────────┐
-                    // │ CHARTS DISPLAY SECTION                                          │
-                    // │ Shows one chart for each measurement type that has data         │
-                    // │ Each chart now has customize and add-reading buttons            │
-                    // └─────────────────────────────────────────────────────────────────┘
-                                        // MARK: Charts Display
-                                        ForEach(measurementTypes, id: \.id) { type in
-                                            if !type.measurements.isEmpty {
-                                                let customization = chartCustomizations[type.id] ?? ChartCustomization()
-                                                
-                                                // ↓↓↓ VStack wraps the chart title + buttons and the chart itself
-                                                VStack(alignment: .leading, spacing: 8) {
-                                                    
-                                                    // ┌─────────────────────────────────────────────┐
-                                                    // │ CHART HEADER with title and action buttons  │
-                                                                                                        // └─────────────────────────────────────────────┘
-                                                                                                        ChartHeaderView(
-                                                                                                            type: type,
-                                                                                                            onCustomize: { customizingType = type },
-                                                                                                            onAddReading: {
-                                                                                                                selectedMeasurementTypeForQuickAdd = type
-                                                                                                                showingAddMeasurement = true
-                                                                                                            }
-                                                                                                        )
-                                                                                                        
-                                                                                                        // ↓↓↓ The actual chart display
-                                                                                                        ChartView(
-                                                                                                            measurementType: type,
-                                                                                                            measurements: filteredMeasurements(for: type.measurements),
-                                                                                                            pointSize: customization.pointSize,
-                                                                                                            pointColor: customization.pointColor,
-                                                                                                            showDataPoints: customization.showDataPoints,
-                                                                                                            showLine: customization.showLine,
-                                                                                                            lineColor: customization.lineColor,
-                                                                                                            lineWidth: customization.lineWidth
-                                                                                                        )
-                                                                                                    }
-                                                                                                    .background(Color(.systemBackground))
-                                                                                                    .cornerRadius(12)
-                                                                                                    .shadow(radius: 2)
-                                                                                                }
-                                                                                            }
-                                                                                            // ↑↑↑ END OF CHARTS DISPLAY ↑↑↑
-                                        
-                                        // MARK: GKI Calculator
-                                        // Show GKI chart if both glucose and ketones exist
-                                        GKICalculatorView(
-                                            startDate: selectedDateFilter.startDate(customStart: customStartDate),
-                                            endDate: selectedDateFilter.endDate(customEnd: customEndDate)
-                                        )
-                                        .background(Color(.systemBackground))
-                                        .cornerRadius(12)
-                                        .shadow(radius: 2)
-                                    }
-                                    .padding()
-                                }
-            .background(
-                LinearGradient(
-                    colors: [Color.purple.opacity(0.3), Color.blue.opacity(0.2)],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-                .ignoresSafeArea()
-            )
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                            // MARK: Add Menu
-                            ToolbarItem(placement: .primaryAction) {
-                                Menu {
-                                    Button {
-                                        showingAddMeasurement = true
-                                    } label: {
-                                        Label("Add Measurement", systemImage: "plus.circle")
-                                    }
-                                    
-                                    Button {
-                                        showingAddMeasurementType = true
-                                    } label: {
-                                        Label("New Measurement Type", systemImage: "chart.line.uptrend.xyaxis")
-                                    }
-                                    
-                                    Button {
-                                        showingMergedChart = true
-                                    } label: {
-                                        Label("Merge Charts", systemImage: "square.stack.3d.up")
-                                    }
-                                    
-                                    Divider()
-                                    
-                                    Button {
-                                        exportData()
-                                    } label: {
-                                        Label("Export Data", systemImage: "square.and.arrow.up")
-                                    }
-                                    
-                                    Menu {
-                                        Button {
-                                            showingImportPicker = true
-                                        } label: {
-                                            Label("Import from File", systemImage: "doc")
-                                        }
-                                        
-                                        Button {
-                                            importFromClipboard()
-                                        } label: {
-                                            Label("Import from Clipboard", systemImage: "doc.on.clipboard")
-                                        }
-                                    } label: {
-                                        Label("Import Data", systemImage: "square.and.arrow.down")
-                                    }
-                                    
-                                    Divider()
-                                    
-                                    Button(role: .destructive) {
-                                        showingDeleteWarning = true
-                                    } label: {
-                                        Label("Delete All Data", systemImage: "trash")
-                                    }
-                                } label: {
-                                    Image(systemName: "plus.circle.fill")
-                                        .font(.title2)
-                                }
-                            }
-                        }
-            // ┌─────────────────────────────────────────────────────────────────┐
-            // │ SHEET 1: Add Measurement (two modes)                            │
-            // │ - If selectedMeasurementTypeForQuickAdd exists = use QuickAdd   │
-            // │ - Otherwise = use full AddMeasurementView                       │
-            // └─────────────────────────────────────────────────────────────────┘
+            }
             .sheet(isPresented: $showingAddMeasurement) {
-                            if let selectedType = selectedMeasurementTypeForQuickAdd {
-                                // ↓↓↓ Quick add - locked to specific measurement type
-                                QuickAddMeasurementView(measurementType: selectedType)
-                                    .onDisappear {
-                                        selectedMeasurementTypeForQuickAdd = nil  // Clear selection
-                                    }
-                            } else {
-                                // ↓↓↓ Full add - user can pick any measurement type
-                                AddMeasurementView()
+                        if let selectedType = selectedMeasurementTypeForQuickAdd {
+                            QuickAddMeasurementView(measurementType: selectedType)
+                                .onDisappear {
+                                    selectedMeasurementTypeForQuickAdd = nil
+                                }
+                        } else {
+                            AddMeasurementView()
+                        }
+                    }
+                    .sheet(isPresented: $showingAddMeasurementType) {
+                        AddMeasurementTypeView()
+                    }
+                    .sheet(item: $customizingType) { type in
+                        ChartCustomizationWrapper(
+                            type: type,
+                            chartCustomizations: $chartCustomizations
+                        )
+                        .onDisappear {
+                            saveCustomizations()
+                        }
+                    }
+                    .sheet(isPresented: $showingDateRangePicker) {
+                        DateRangeFilterView(
+                            selectedFilter: $selectedDateFilter,
+                            customStartDate: $customStartDate,
+                            customEndDate: $customEndDate
+                        )
+                    }
+                    .sheet(isPresented: $showingMergedChart) {
+                                MergedChartView()
                             }
+                    .alert("Export Data", isPresented: $showingExportAlert) {
+                        Button("OK") { }
+                    } message: {
+                        Text(exportMessage)
+                    }
+                    .alert("Import Data", isPresented: $showingImportAlert) {
+                        Button("OK") { }
+                    } message: {
+                        Text(importMessage)
+                    }
+                    .alert("⚠️ WARNING", isPresented: $showingDeleteWarning) {
+                        Button("Cancel", role: .cancel) { }
+                        Button("Continue", role: .destructive) {
+                            showingFinalDeleteWarning = true
                         }
-                        .sheet(isPresented: $showingAddMeasurementType) {
-                            AddMeasurementTypeView()
+                    } message: {
+                        Text("This will permanently delete ALL your health data. Are you sure?")
+                    }
+                    .alert("🚨 NO REALLY", isPresented: $showingFinalDeleteWarning) {
+                        Button("Cancel", role: .cancel) { }
+                        Button("Delete Everything", role: .destructive) {
+                            deleteAllData()
                         }
-                        .sheet(item: $customizingType) { type in
-                            ChartCustomizationWrapper(
-                                type: type,
-                                chartCustomizations: $chartCustomizations
-                            )
-                            .onDisappear {
-                                saveCustomizations()
+                    } message: {
+                        Text("This cannot be undone. All measurements will be lost forever. Delete everything?")
+                    }
+                    .fileImporter(
+                        isPresented: $showingImportPicker,
+                        allowedContentTypes: [.item],
+                        allowsMultipleSelection: false
+                    ) { result in
+                        handleImport(result: result)
+                    }
+                    .onAppear {
+                        loadCustomizations()
+                    }
+        }
+        
+        // MARK: - Charts View Components
+        
+        private var chartsScrollView: some View {
+            ScrollView {
+                VStack(spacing: 20) {
+                    chartsHeader
+                    chartsContent
+                }
+                .padding()
+            }
+        }
+        
+        private var chartsHeader: some View {
+            HStack {
+                Text("ChartAnything")
+                    .font(.largeTitle)
+                    .bold()
+                
+                Spacer()
+                
+                Button {
+                    showingDateRangePicker = true
+                } label: {
+                    Image(systemName: "calendar")
+                        .font(.title2)
+                        .foregroundStyle(.blue)
+                }
+            }
+        }
+        
+        private var chartsContent: some View {
+            Group {
+                ForEach(measurementTypes, id: \.id) { type in
+                    if !type.measurements.isEmpty {
+                        chartCard(for: type)
+                    }
+                }
+                
+                gkiSection
+            }
+        }
+        
+        private var gkiSection: some View {
+            GKICalculatorView(
+                startDate: selectedDateFilter.startDate(customStart: customStartDate),
+                endDate: selectedDateFilter.endDate(customEnd: customEndDate)
+            )
+            .background(Color(.systemBackground))
+            .cornerRadius(12)
+            .shadow(radius: 2)
+        }
+        
+        private var chartBackground: some View {
+            LinearGradient(
+                colors: [Color.purple.opacity(0.3), Color.blue.opacity(0.2)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            .ignoresSafeArea()
+        }
+                
+                // MARK: - Toolbar Menu Components
+                
+                /// Main toolbar menu with all actions
+                private var toolbarMenu: some View {
+                    Menu {
+                        addMenuButtons
+                        
+                        Divider()
+                        
+                        dataMenuButtons
+                        
+                        Divider()
+                        
+                        deleteButton
+                    } label: {
+                        Image(systemName: "plus.circle.fill")
+                            .font(.title2)
+                    }
+                }
+                
+                /// Add measurement buttons
+                private var addMenuButtons: some View {
+                    Group {
+                        Button {
+                            showingAddMeasurement = true
+                        } label: {
+                            Label("Add Measurement", systemImage: "plus.circle")
+                        }
+                        
+                        Button {
+                            showingAddMeasurementType = true
+                        } label: {
+                            Label("New Measurement Type", systemImage: "chart.line.uptrend.xyaxis")
+                        }
+                        
+                        Button {
+                            showingMergedChart = true
+                        } label: {
+                            Label("Merge Charts", systemImage: "square.stack.3d.up")
+                        }
+                    }
+                }
+                
+                /// Export and import buttons
+                private var dataMenuButtons: some View {
+                    Group {
+                        Button {
+                            exportData()
+                        } label: {
+                            Label("Export Data", systemImage: "square.and.arrow.up")
+                        }
+                        
+                        Menu {
+                            Button {
+                                showingImportPicker = true
+                            } label: {
+                                Label("Import from File", systemImage: "doc")
                             }
+                            
+                            Button {
+                                importFromClipboard()
+                            } label: {
+                                Label("Import from Clipboard", systemImage: "doc.on.clipboard")
+                            }
+                        } label: {
+                            Label("Import Data", systemImage: "square.and.arrow.down")
                         }
-            .sheet(isPresented: $showingDateRangePicker) {                DateRangeFilterView(
-                    selectedFilter: $selectedDateFilter,
-                    customStartDate: $customStartDate,
-                    customEndDate: $customEndDate
+                    }
+                }
+                
+    /// Delete all data button
+        private var deleteButton: some View {
+            Button(role: .destructive) {
+                showingDeleteWarning = true
+            } label: {
+                Label("Delete All Data", systemImage: "trash")
+            }
+        }
+        
+        // MARK: - Chart Helper
+        
+        /// Creates a chart card for a measurement type
+        private func chartCard(for type: MeasurementType) -> some View {
+            let customization = chartCustomizations[type.id] ?? ChartCustomization()
+            
+            return VStack(alignment: .leading, spacing: 8) {
+                ChartHeaderView(
+                    type: type,
+                    onCustomize: { customizingType = type },
+                    onAddReading: {
+                        selectedMeasurementTypeForQuickAdd = type
+                        showingAddMeasurement = true
+                    }
+                )
+                
+                ChartView(
+                    measurementType: type,
+                    measurements: filteredMeasurements(for: type.measurements),
+                    pointSize: customization.pointSize,
+                    pointColor: customization.pointColor,
+                    showDataPoints: customization.showDataPoints,
+                    showLine: customization.showLine,
+                    lineColor: customization.lineColor,
+                    lineWidth: customization.lineWidth
                 )
             }
-            .sheet(isPresented: $showingMergedChart) {
-                            MergedChartView()
-                        }
-            .alert("Export Data", isPresented: $showingExportAlert) {
-                            Button("OK") { }
-                        } message: {
-                            Text(exportMessage)
-                        }
-                        .alert("Import Data", isPresented: $showingImportAlert) {
-                                        Button("OK") { }
-                                    } message: {
-                                        Text(importMessage)
-                                    }
-                                    .alert("⚠️ WARNING", isPresented: $showingDeleteWarning) {
-                                        Button("Cancel", role: .cancel) { }
-                                        Button("Continue", role: .destructive) {
-                                            showingFinalDeleteWarning = true
-                                        }
-                                    } message: {
-                                        Text("This will permanently delete ALL your health data. Are you sure?")
-                                    }
-                                    .alert("🚨 NO REALLY", isPresented: $showingFinalDeleteWarning) {
-                                        Button("Cancel", role: .cancel) { }
-                                        Button("Delete Everything", role: .destructive) {
-                                            deleteAllData()
-                                        }
-                                    } message: {
-                                                                            Text("This cannot be undone. All measurements will be lost forever. Delete everything?")
-                                                                        }
-                                                                       
-                                                            .fileImporter(
-                                                                isPresented: $showingImportPicker,
-                                                                allowedContentTypes: [.item],
-                                                                allowsMultipleSelection: false
-                                                            ) { result in
-                                                                handleImport(result: result)
-                                                            }
-                                                            .onAppear {
-                                                                                        loadCustomizations()
-                                                                                    }
-                                                                    }
-                                                                }
+            .background(Color(.systemBackground))
+            .cornerRadius(12)
+            .shadow(radius: 2)
+        }
                                                                 
                                                                 // ┌─────────────────────────────────────────────────────────────┐
                                                                 // │ ADD DATA VIEW (Tab 2)                                        │
@@ -581,86 +612,85 @@ struct ContentView: View {
                                                                     }
                                                                 }
                                                                 
-                                                                // MARK: - Customization Persistence
-                                                                
-                                                                /// Load saved customizations from database
-                                                                private func loadCustomizations() {
-                                                                    for saved in savedCustomizations {
-                                                                        chartCustomizations[saved.measurementTypeID] = saved.toChartCustomization()
-                                                                    }
-                                                                }
-
-                                        
-                                        /// Save customizations to database
-                                        private func saveCustomizations() {
-                                            for (typeID, customization) in chartCustomizations {
-                                                // Find existing saved customization or create new one
-                                                if let existing = savedCustomizations.first(where: { $0.measurementTypeID == typeID }) {
-                                                    existing.update(from: customization)
-                                                } else {
-                                                    let newCustomization = ChartCustomizationModel(
-                                                        measurementTypeID: typeID,
-                                                        pointSize: customization.pointSize,
-                                                        pointColorHex: customization.pointColor.toHex() ?? "007AFF",
-                                                        showDataPoints: customization.showDataPoints,
-                                                        showLine: customization.showLine,
-                                                        lineColorHex: customization.lineColor.toHex() ?? "007AFF",
-                                                        lineWidth: customization.lineWidth
-                                                    )
-                                                    modelContext.insert(newCustomization)
-                                                }
-                                            }
-                                            
-                                            try? modelContext.save()
-                                        }
-                                    }
-
-// MARK: - Activity View Controller
-/// UIKit share sheet wrapper for SwiftUI
-struct ActivityViewController: UIViewControllerRepresentable {
-    let activityItems: [Any]
-    let applicationActivities: [UIActivity]? = nil
+// MARK: - Customization Persistence
     
-    func makeUIViewController(context: Context) -> UIActivityViewController {
-        let controller = UIActivityViewController(
-            activityItems: activityItems,
-            applicationActivities: applicationActivities
-        )
-        return controller
+    /// Load saved customizations from database
+    private func loadCustomizations() {
+        for saved in savedCustomizations {
+            chartCustomizations[saved.measurementTypeID] = saved.toChartCustomization()
+        }
     }
     
-    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
-}
-
-// MARK: - Color Extension
-/// Helper extension to convert hex color strings to SwiftUI Color
-extension Color {
-    /// Initialize a Color from a hex string (e.g., "#FF6B6B" or "FF6B6B")
-    /// - Parameter hex: Hex color string with or without # prefix
-    /// - Returns: Color if valid hex, nil otherwise
-    init?(hex: String) {
-        // Remove any non-alphanumeric characters (like #)
-        let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
-        var int: UInt64 = 0
-        Scanner(string: hex).scanHexInt64(&int)
-        let a, r, g, b: UInt64
-        
-        switch hex.count {
-        case 6: // RGB (no alpha) - assume full opacity
-            (a, r, g, b) = (255, int >> 16, int >> 8 & 0xFF, int & 0xFF)
-        case 8: // ARGB (with alpha)
-            (a, r, g, b) = (int >> 24, int >> 16 & 0xFF, int >> 8 & 0xFF, int & 0xFF)
-        default:
-            return nil
+    /// Save customizations to database
+    private func saveCustomizations() {
+        for (typeID, customization) in chartCustomizations {
+            // Find existing saved customization or create new one
+            if let existing = savedCustomizations.first(where: { $0.measurementTypeID == typeID }) {
+                existing.update(from: customization)
+            } else {
+                let newCustomization = ChartCustomizationModel(
+                    measurementTypeID: typeID,
+                    pointSize: customization.pointSize,
+                    pointColorHex: customization.pointColor.toHex() ?? "007AFF",
+                    showDataPoints: customization.showDataPoints,
+                    showLine: customization.showLine,
+                    lineColorHex: customization.lineColor.toHex() ?? "007AFF",
+                    lineWidth: customization.lineWidth
+                )
+                modelContext.insert(newCustomization)
+            }
         }
         
-        // Convert to 0-1 range
-        self.init(
-            .sRGB,
-            red: Double(r) / 255,
-            green: Double(g) / 255,
-            blue: Double(b) / 255,
-            opacity: Double(a) / 255
-        )
+        try? modelContext.save()
     }
 }
+
+                                                            // MARK: - Activity View Controller
+                                                            /// UIKit share sheet wrapper for SwiftUI
+                                                            struct ActivityViewController: UIViewControllerRepresentable {
+                                                                let activityItems: [Any]
+                                                                let applicationActivities: [UIActivity]? = nil
+                                                                
+                                                                func makeUIViewController(context: Context) -> UIActivityViewController {
+                                                                    let controller = UIActivityViewController(
+                                                                        activityItems: activityItems,
+                                                                        applicationActivities: applicationActivities
+                                                                    )
+                                                                    return controller
+                                                                }
+                                                                
+                                                                func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
+                                                            }
+
+                                                            // MARK: - Color Extension
+                                                            /// Helper extension to convert hex color strings to SwiftUI Color
+                                                            extension Color {
+                                                                /// Initialize a Color from a hex string (e.g., "#FF6B6B" or "FF6B6B")
+                                                                /// - Parameter hex: Hex color string with or without # prefix
+                                                                /// - Returns: Color if valid hex, nil otherwise
+                                                                init?(hex: String) {
+                                                                    // Remove any non-alphanumeric characters (like #)
+                                                                    let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
+                                                                    var int: UInt64 = 0
+                                                                    Scanner(string: hex).scanHexInt64(&int)
+                                                                    let a, r, g, b: UInt64
+                                                                    
+                                                                    switch hex.count {
+                                                                    case 6: // RGB (no alpha) - assume full opacity
+                                                                        (a, r, g, b) = (255, int >> 16, int >> 8 & 0xFF, int & 0xFF)
+                                                                    case 8: // ARGB (with alpha)
+                                                                        (a, r, g, b) = (int >> 24, int >> 16 & 0xFF, int >> 8 & 0xFF, int & 0xFF)
+                                                                    default:
+                                                                        return nil
+                                                                    }
+                                                                    
+                                                                    // Convert to 0-1 range
+                                                                    self.init(
+                                                                        .sRGB,
+                                                                        red: Double(r) / 255,
+                                                                        green: Double(g) / 255,
+                                                                        blue: Double(b) / 255,
+                                                                        opacity: Double(a) / 255
+                                                                    )
+                                                                }
+                                                            }
