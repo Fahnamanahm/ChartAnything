@@ -118,16 +118,18 @@ struct ContentView: View {
         /// Track customization settings for each measurement type
         @State private var chartCustomizations: [UUID: ChartCustomization] = [:]
         /// Currently customizing this measurement type
-        @State private var customizingType: MeasurementType?
-        /// Track which measurement type is selected for quick-add
-        @State private var selectedMeasurementTypeForQuickAdd: MeasurementType?
-        /// Controls whether the QuickAdd sheet is shown
-        @State private var showingQuickAdd = false
-        /// Selected date range filter
-        @State private var selectedDateFilter: DateRangeFilter = .allTime
-        /// Custom start date for filtering
-        @State private var customStartDate: Date = Date()
-        /// Custom end date for filtering
+    @State private var customizingType: MeasurementType?
+            /// Track which measurement type is selected for quick-add
+            @State private var selectedMeasurementTypeForQuickAdd: MeasurementType?
+            /// Controls whether the QuickAdd sheet is shown
+            @State private var showingQuickAdd = false
+            /// Track which tab is currently selected (0=Charts, 1=Add Data, 2=Settings)
+            @State private var selectedTab = 0
+            /// Selected date range filter
+            @State private var selectedDateFilter: DateRangeFilter = .allTime
+            /// Custom start date for filtering
+            @State private var customStartDate: Date = Date()
+            /// Custom end date for filtering
         @State private var customEndDate: Date = Date()
         /// Show date range picker sheet
         @State private var showingDateRangePicker = false
@@ -279,41 +281,45 @@ struct ContentView: View {
             }
         }
     
-    // ┌─────────────────────────────────────────────────────────────────┐
-    // │ MAIN APP BODY - TAB NAVIGATION                                  │
-    // │ Three tabs: Charts, Add Data, Settings                          │
-    // └─────────────────────────────────────────────────────────────────┘
-        // MARK: - Body
-        var body: some View {
-            TabView {
-                // ┌─────────────────────────────────────────────────────┐
-                // │ TAB 1: CHARTS VIEW                                  │
-                // │ Shows all your measurement charts                   │
-                // └─────────────────────────────────────────────────────┘
-                chartsView
-                    .tabItem {
-                        Label("Charts", systemImage: "chart.line.uptrend.xyaxis")
-                    }
-                
-                // ┌─────────────────────────────────────────────────────┐
-                // │ TAB 2: ADD DATA VIEW                                │
-                // │ Quick entry screen for adding measurements          │
-                // └─────────────────────────────────────────────────────┘
-                addDataView
-                    .tabItem {
-                        Label("Add Data", systemImage: "plus.circle.fill")
-                    }
-                
-                // ┌─────────────────────────────────────────────────────┐
-                // │ TAB 3: SETTINGS VIEW                                │
-                // │ App settings, export/import, etc.                   │
-                // └─────────────────────────────────────────────────────┘
-                settingsView
-                    .tabItem {
-                        Label("Settings", systemImage: "gearshape.fill")
-                    }
+        // ┌─────────────────────────────────────────────────────────────────┐
+        // │ MAIN APP BODY - TAB NAVIGATION                                  │
+        // │ Three tabs: Charts, Add Data, Settings                          │
+        // └─────────────────────────────────────────────────────────────────┘
+            // MARK: - Body
+            var body: some View {
+                TabView(selection: $selectedTab) {
+                    // ┌─────────────────────────────────────────────────────┐
+                    // │ TAB 1: CHARTS VIEW                                  │
+                    // │ Shows all your measurement charts                   │
+                    // └─────────────────────────────────────────────────────┘
+                    chartsView
+                        .tabItem {
+                            Label("Charts", systemImage: "chart.line.uptrend.xyaxis")
+                        }
+                        .tag(0)
+                    
+                    // ┌─────────────────────────────────────────────────────┐
+                    // │ TAB 2: ADD DATA VIEW                                │
+                    // │ Quick entry screen for adding measurements          │
+                    // └─────────────────────────────────────────────────────┘
+                    addDataView
+                        .tabItem {
+                            Label("Add Data", systemImage: "plus.circle.fill")
+                        }
+                        .tag(1)
+                    
+                    // ┌─────────────────────────────────────────────────────┐
+                    // │ TAB 3: SETTINGS VIEW                                │
+                    // │ App settings, export/import, etc.                   │
+                    // └─────────────────────────────────────────────────────┘
+                    settingsView
+                        .tabItem {
+                            Label("Settings", systemImage: "gearshape.fill")
+                        }
+                        .tag(2)
+                }
             }
-        }
+    
         
     // ┌─────────────────────────────────────────────────────────────┐
     // │ CHARTS VIEW (Tab 1)                                          │
@@ -580,23 +586,73 @@ struct ContentView: View {
             // │ ADD DATA VIEW (Tab 2)                                        │
             // │ Quick entry screen for adding new measurements              │
             // └─────────────────────────────────────────────────────────────┘
-            private var addDataView: some View {
-                NavigationStack {
-                    VStack(spacing: 20) {
-                        Text("Add Data")
-                            .font(.largeTitle)
-                            .bold()
-                            .padding()
-                        
-                        Text("Quick entry coming soon!")
-                            .foregroundStyle(.secondary)
-                        
-                        Spacer()
+    private var addDataView: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 20) {
+                    // Date range picker at top
+                    Button {
+                        showingDateRangePicker = true
+                    } label: {
+                        HStack {
+                            Image(systemName: "calendar")
+                            Text(selectedDateFilter.rawValue)
+                        }
+                        .padding()
+                        .background(Color.blue.opacity(0.1))
+                        .cornerRadius(8)
                     }
-                    .navigationTitle("Add Data")
-                    .navigationBarTitleDisplayMode(.inline)
-                }
-            }
+                    .padding(.top)
+                    
+                    // Entry fields for each measurement type
+                    ForEach(measurementTypes.sorted(by: { $0.name < $1.name }), id: \.id) { type in
+                        MeasurementEntryRow(
+                            measurementType: type,
+                            onSave: { value, timestamp, notes in
+                                saveMeasurement(value: value, timestamp: timestamp, notes: notes, type: type)
+                            }
+                        )
+                    }
+                    
+                    // GKI navigator button
+                                        if measurementTypes.contains(where: { $0.name == "Glucose" }) &&
+                                           measurementTypes.contains(where: { $0.name == "Ketones" }) {
+                                            Button {
+                                                selectedTab = 0
+                                            } label: {
+                                                HStack {
+                                                    Image(systemName: "chart.line.uptrend.xyaxis")
+                                                    Text("View GKI Calculator")
+                                                    Spacer()
+                                                    Image(systemName: "chevron.right")
+                                                }
+                                                .padding()
+                                                .background(Color.purple.opacity(0.1))
+                                                .cornerRadius(8)
+                                            }
+                                            .buttonStyle(.plain)
+                                        }
+                                    }
+                                    .padding()
+                                }
+                                .navigationTitle("Add Data")
+                                .navigationBarTitleDisplayMode(.inline)
+                            }
+                        }
+
+    // Helper function to save measurement and navigate to chart
+        private func saveMeasurement(value: Double, timestamp: Date, notes: String?, type: MeasurementType) {
+            let measurement = Measurement(
+                value: value,
+                timestamp: timestamp,
+                notes: notes?.isEmpty == false ? notes : nil
+            )
+            measurement.measurementType = type
+            modelContext.insert(measurement)
+            
+            // Navigate to Charts tab
+            selectedTab = 0
+        }
             
             // ┌─────────────────────────────────────────────────────────────┐
             // │ SETTINGS VIEW (Tab 3)                                        │
