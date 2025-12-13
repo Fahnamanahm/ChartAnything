@@ -111,16 +111,18 @@ struct ContentView: View {
         @Query private var savedCustomizations: [ChartCustomizationModel]
     
     // MARK: - State Properties
-    /// Controls whether the "Add Measurement" sheet is shown
-    @State private var showingAddMeasurement = false
-    /// Controls whether the "Add Measurement Type" sheet is shown
-    @State private var showingAddMeasurementType = false
-    /// Track customization settings for each measurement type
-    @State private var chartCustomizations: [UUID: ChartCustomization] = [:]
-    /// Currently customizing this measurement type
-    @State private var customizingType: MeasurementType?
+        /// Controls whether the "Add Measurement" sheet is shown
+        @State private var showingAddMeasurement = false
+        /// Controls whether the "Add Measurement Type" sheet is shown
+        @State private var showingAddMeasurementType = false
+        /// Track customization settings for each measurement type
+        @State private var chartCustomizations: [UUID: ChartCustomization] = [:]
+        /// Currently customizing this measurement type
+        @State private var customizingType: MeasurementType?
         /// Track which measurement type is selected for quick-add
         @State private var selectedMeasurementTypeForQuickAdd: MeasurementType?
+        /// Controls whether the QuickAdd sheet is shown
+        @State private var showingQuickAdd = false
         /// Selected date range filter
         @State private var selectedDateFilter: DateRangeFilter = .allTime
         /// Custom start date for filtering
@@ -128,7 +130,7 @@ struct ContentView: View {
         /// Custom end date for filtering
         @State private var customEndDate: Date = Date()
         /// Show date range picker sheet
-    @State private var showingDateRangePicker = false
+        @State private var showingDateRangePicker = false
         /// Show merged chart view
         @State private var showingMergedChart = false
         /// Show import file picker
@@ -146,6 +148,8 @@ struct ContentView: View {
         /// Show delete warning alerts
         @State private var showingDeleteWarning = false
         @State private var showingFinalDeleteWarning = false
+    
+    
     // MARK: - Methods
         
     /// Export all measurements to clipboard as CSV
@@ -311,90 +315,94 @@ struct ContentView: View {
             }
         }
         
-        // ┌─────────────────────────────────────────────────────────────┐
-        // │ CHARTS VIEW (Tab 1)                                          │
-        // │ The main charts display - what used to be the whole app     │
-        // └─────────────────────────────────────────────────────────────┘
+    // ┌─────────────────────────────────────────────────────────────┐
+    // │ CHARTS VIEW (Tab 1)                                          │
+    // │ The main charts display - what used to be the whole app     │
+    // └─────────────────────────────────────────────────────────────┘
     private var chartsView: some View {
-            NavigationStack {
-                chartsScrollView
-                    .background(chartBackground)
-                    .navigationBarTitleDisplayMode(.inline)
-                    .toolbar {
-                        ToolbarItem(placement: .primaryAction) {
-                            toolbarMenu
-                        }
+        NavigationStack {
+            chartsScrollView
+                .background(chartBackground)
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .primaryAction) {
+                        toolbarMenu
                     }
-            }
-            .sheet(isPresented: $showingAddMeasurement) {
-                        if let selectedType = selectedMeasurementTypeForQuickAdd {
-                            QuickAddMeasurementView(measurementType: selectedType)
-                                .onDisappear {
-                                    selectedMeasurementTypeForQuickAdd = nil
-                                }
-                        } else {
-                            AddMeasurementView()
-                        }
-                    }
-                    .sheet(isPresented: $showingAddMeasurementType) {
-                        AddMeasurementTypeView()
-                    }
-                    .sheet(item: $customizingType) { type in
-                        ChartCustomizationWrapper(
-                            type: type,
-                            chartCustomizations: $chartCustomizations
-                        )
-                        .onDisappear {
-                            saveCustomizations()
-                        }
-                    }
-                    .sheet(isPresented: $showingDateRangePicker) {
-                        DateRangeFilterView(
-                            selectedFilter: $selectedDateFilter,
-                            customStartDate: $customStartDate,
-                            customEndDate: $customEndDate
-                        )
-                    }
-                    .sheet(isPresented: $showingMergedChart) {
-                                MergedChartView()
-                            }
-                    .alert("Export Data", isPresented: $showingExportAlert) {
-                        Button("OK") { }
-                    } message: {
-                        Text(exportMessage)
-                    }
-                    .alert("Import Data", isPresented: $showingImportAlert) {
-                        Button("OK") { }
-                    } message: {
-                        Text(importMessage)
-                    }
-                    .alert("⚠️ WARNING", isPresented: $showingDeleteWarning) {
-                        Button("Cancel", role: .cancel) { }
-                        Button("Continue", role: .destructive) {
-                            showingFinalDeleteWarning = true
-                        }
-                    } message: {
-                        Text("This will permanently delete ALL your health data. Are you sure?")
-                    }
-                    .alert("🚨 NO REALLY", isPresented: $showingFinalDeleteWarning) {
-                        Button("Cancel", role: .cancel) { }
-                        Button("Delete Everything", role: .destructive) {
-                            deleteAllData()
-                        }
-                    } message: {
-                        Text("This cannot be undone. All measurements will be lost forever. Delete everything?")
-                    }
-                    .fileImporter(
-                        isPresented: $showingImportPicker,
-                        allowedContentTypes: [.item],
-                        allowsMultipleSelection: false
-                    ) { result in
-                        handleImport(result: result)
-                    }
-                    .onAppear {
-                        loadCustomizations()
-                    }
+                }
         }
+        .sheet(isPresented: $showingAddMeasurement) {
+            if let selectedType = selectedMeasurementTypeForQuickAdd {
+                QuickAddMeasurementView(measurementType: selectedType)
+                    .onDisappear {
+                        selectedMeasurementTypeForQuickAdd = nil
+                    }
+            } else {
+                AddMeasurementView()
+            }
+        }
+        .sheet(isPresented: $showingAddMeasurementType) {
+            AddMeasurementTypeView()
+        }
+        .sheet(item: $customizingType) { type in
+            ChartCustomizationWrapper(
+                type: type,
+                chartCustomizations: $chartCustomizations
+            )
+            .onDisappear {
+                saveCustomizations()
+            }
+        }
+        .sheet(isPresented: $showingDateRangePicker) {
+            DateRangeFilterView(
+                selectedFilter: $selectedDateFilter,
+                customStartDate: $customStartDate,
+                customEndDate: $customEndDate
+            )
+        }
+        .sheet(isPresented: $showingMergedChart) {
+            MergedChartView()
+        }
+        .sheet(item: $selectedMeasurementTypeForQuickAdd) { selectedType in
+                    let _ = print("DEBUG: Showing QuickAdd for \(selectedType.name)")
+                    QuickAddMeasurementView(measurementType: selectedType)
+                }
+        .alert("Export Data", isPresented: $showingExportAlert) {
+            Button("OK") { }
+        } message: {
+            Text(exportMessage)
+        }
+        .alert("Import Data", isPresented: $showingImportAlert) {
+            Button("OK") { }
+        } message: {
+            Text(importMessage)
+        }
+        .alert("⚠️ WARNING", isPresented: $showingDeleteWarning) {
+            Button("Cancel", role: .cancel) { }
+            Button("Continue", role: .destructive) {
+                showingFinalDeleteWarning = true
+            }
+        } message: {
+            Text("This will permanently delete ALL your health data. Are you sure?")
+        }
+        .alert("🚨 NO REALLY", isPresented: $showingFinalDeleteWarning) {
+            Button("Cancel", role: .cancel) { }
+            Button("Delete Everything", role: .destructive) {
+                deleteAllData()
+            }
+        } message: {
+            Text("This cannot be undone. All measurements will be lost forever. Delete everything?")
+        }
+        .fileImporter(
+            isPresented: $showingImportPicker,
+            allowedContentTypes: [.item],
+            allowsMultipleSelection: false
+        ) { result in
+            handleImport(result: result)
+        }
+        .onAppear {
+            loadCustomizations()
+        }
+    }
         
         // MARK: - Charts View Components
         
@@ -536,81 +544,81 @@ struct ContentView: View {
             }
         }
         
-        // MARK: - Chart Helper
-        
-        /// Creates a chart card for a measurement type
-        private func chartCard(for type: MeasurementType) -> some View {
-            let customization = chartCustomizations[type.id] ?? ChartCustomization()
-            
-            return VStack(alignment: .leading, spacing: 8) {
-                ChartHeaderView(
-                    type: type,
-                    onCustomize: { customizingType = type },
-                    onAddReading: {
-                        selectedMeasurementTypeForQuickAdd = type
-                        showingAddMeasurement = true
-                    }
-                )
+    // MARK: - Chart Helper
                 
-                ChartView(
-                    measurementType: type,
-                    measurements: filteredMeasurements(for: type.measurements),
-                    pointSize: customization.pointSize,
-                    pointColor: customization.pointColor,
-                    showDataPoints: customization.showDataPoints,
-                    showLine: customization.showLine,
-                    lineColor: customization.lineColor,
-                    lineWidth: customization.lineWidth
-                )
+                /// Creates a chart card for a measurement type
+                private func chartCard(for type: MeasurementType) -> some View {
+                    let customization = chartCustomizations[type.id] ?? ChartCustomization()
+                    
+                    return VStack(alignment: .leading, spacing: 8) {
+                        ChartHeaderView(
+                            type: type,
+                            onCustomize: { customizingType = type },
+                            onAddReading: {
+                                selectedMeasurementTypeForQuickAdd = type
+                                showingQuickAdd = true
+                            }
+                        )
+                        
+                        ChartView(
+                            measurementType: type,
+                            measurements: filteredMeasurements(for: type.measurements),
+                            pointSize: customization.pointSize,
+                            pointColor: customization.pointColor,
+                            showDataPoints: customization.showDataPoints,
+                            showLine: customization.showLine,
+                            lineColor: customization.lineColor,
+                            lineWidth: customization.lineWidth
+                        )
+                    }
+                    .background(Color(.systemBackground))
+                    .cornerRadius(12)
+                    .shadow(radius: 2)
+                }
+            
+            // ┌─────────────────────────────────────────────────────────────┐
+            // │ ADD DATA VIEW (Tab 2)                                        │
+            // │ Quick entry screen for adding new measurements              │
+            // └─────────────────────────────────────────────────────────────┘
+            private var addDataView: some View {
+                NavigationStack {
+                    VStack(spacing: 20) {
+                        Text("Add Data")
+                            .font(.largeTitle)
+                            .bold()
+                            .padding()
+                        
+                        Text("Quick entry coming soon!")
+                            .foregroundStyle(.secondary)
+                        
+                        Spacer()
+                    }
+                    .navigationTitle("Add Data")
+                    .navigationBarTitleDisplayMode(.inline)
+                }
             }
-            .background(Color(.systemBackground))
-            .cornerRadius(12)
-            .shadow(radius: 2)
-        }
-                                                                
-                                                                // ┌─────────────────────────────────────────────────────────────┐
-                                                                // │ ADD DATA VIEW (Tab 2)                                        │
-                                                                // │ Quick entry screen for adding new measurements              │
-                                                                // └─────────────────────────────────────────────────────────────┘
-                                                                private var addDataView: some View {
-                                                                    NavigationStack {
-                                                                        VStack(spacing: 20) {
-                                                                            Text("Add Data")
-                                                                                .font(.largeTitle)
-                                                                                .bold()
-                                                                                .padding()
-                                                                            
-                                                                            Text("Quick entry coming soon!")
-                                                                                .foregroundStyle(.secondary)
-                                                                            
-                                                                            Spacer()
-                                                                        }
-                                                                        .navigationTitle("Add Data")
-                                                                        .navigationBarTitleDisplayMode(.inline)
-                                                                    }
-                                                                }
-                                                                
-                                                                // ┌─────────────────────────────────────────────────────────────┐
-                                                                // │ SETTINGS VIEW (Tab 3)                                        │
-                                                                // │ App settings, export/import, delete data, etc.              │
-                                                                // └─────────────────────────────────────────────────────────────┘
-                                                                private var settingsView: some View {
-                                                                    NavigationStack {
-                                                                        VStack(spacing: 20) {
-                                                                            Text("Settings")
-                                                                                .font(.largeTitle)
-                                                                                .bold()
-                                                                                .padding()
-                                                                            
-                                                                            Text("Settings coming soon!")
-                                                                                .foregroundStyle(.secondary)
-                                                                            
-                                                                            Spacer()
-                                                                        }
-                                                                        .navigationTitle("Settings")
-                                                                        .navigationBarTitleDisplayMode(.inline)
-                                                                    }
-                                                                }
+            
+            // ┌─────────────────────────────────────────────────────────────┐
+            // │ SETTINGS VIEW (Tab 3)                                        │
+            // │ App settings, export/import, delete data, etc.              │
+            // └─────────────────────────────────────────────────────────────┘
+            private var settingsView: some View {
+                NavigationStack {
+                    VStack(spacing: 20) {
+                        Text("Settings")
+                            .font(.largeTitle)
+                            .bold()
+                            .padding()
+                        
+                        Text("Settings coming soon!")
+                            .foregroundStyle(.secondary)
+                        
+                        Spacer()
+                    }
+                    .navigationTitle("Settings")
+                    .navigationBarTitleDisplayMode(.inline)
+                }
+            }
                                                                 
 // MARK: - Customization Persistence
     
