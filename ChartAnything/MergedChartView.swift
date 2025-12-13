@@ -448,35 +448,75 @@ struct MergedChartView: View {
                 }
                 .chartYScale(domain: 0...100)
                 .chartYAxis {
-                    // Left Y-axis (actual values for measurement 1)
-                    AxisMarks(position: .leading, values: [0, 25, 50, 75, 100]) { value in
-                        AxisValueLabel {
-                            if let normalizedValue = value.as(Double.self) {
-                                let actualValue = denormalize(normalizedValue, min: range1.min, max: range1.max)
-                                Text(String(format: "%.0f", actualValue))
-                                    .foregroundStyle(config1.lineColor)
-                                    .font(.caption2)
-                            }
-                        }
-                        AxisGridLine()
-                    }
-                }
-                .overlay(alignment: .trailing) {
-                                    // Right Y-axis labels (actual values for measurement 2)
-                                    VStack {
-                                        ForEach([100, 75, 50, 25, 0], id: \.self) { normalizedValue in
-                                            let actualValue = denormalize(Double(normalizedValue), min: range2.min, max: range2.max)
-                                            
-                                            Spacer()
-                                            
-                                            Text(String(format: "%.0f", actualValue))
-                                                .font(.caption2)
-                                                .foregroundStyle(config2.lineColor)
+                                    // Left Y-axis (actual values for measurement 1)
+                                    
+                                    // ❌ PROBLEM: Using normalized values [0, 25, 50, 75, 100] creates 5 labels
+                                    // The "0" label gets positioned at the very bottom of the chart frame,
+                                    // which overlaps with the X-axis labels below it.
+                    // ❌ PROBLEM: Using normalized values [0, 25, 50, 75, 100] creates 5 labels
+                                        // The "0" label gets positioned at the very bottom of the chart frame,
+                                        // which overlaps with the X-axis labels below it.
+                                        // AxisMarks(position: .leading, values: [0, 25, 50, 75, 100]) { value in
+                                        
+                                        // ✅ SOLUTION: Remove the "0" value so we only have 4 labels [25, 50, 75, 100]
+                                        // This keeps the lowest label above the X-axis area
+                                        // ✅ Use GKI-specific values (1, 3, 6, 9) if type1 is GKI, otherwise use generic values
+                                        AxisMarks(
+                                            position: .leading,
+                                            values: isType1GKI ? [11.11, 33.33, 66.67, 100] : [25, 50, 75, 100]
+                                        ) { value in
+                                            AxisValueLabel {
+                                                if let normalizedValue = value.as(Double.self) {
+                                                    let actualValue = denormalize(normalizedValue, min: range1.min, max: range1.max)
+                                                    
+                                                    // For GKI, show 1, 3, 6, 9 instead of calculated values
+                                                    if isType1GKI {
+                                                        let gkiValue = actualValue <= 1.5 ? 1 : (actualValue <= 4.5 ? 3 : (actualValue <= 7.5 ? 6 : 9))
+                                                        Text("\(gkiValue)")
+                                                            .foregroundStyle(config1.lineColor)
+                                                            .font(.caption2)
+                                                    } else {
+                                                        Text(String(format: "%.0f", actualValue))
+                                                            .foregroundStyle(config1.lineColor)
+                                                            .font(.caption2)
+                                                    }
+                                                }
+                                            }
+                                            AxisGridLine()
                                         }
                                     }
-                                    .frame(height: 300)
-                                    .padding(.trailing, 8)
-                                }
+                                    .overlay(alignment: .trailing) {
+                                    // Right Y-axis labels (actual values for measurement 2)
+                                    VStack(spacing: 0) {
+                                        // ❌ PROBLEM: The "0" value creates a label at the very bottom that overlaps X-axis
+                                        // ForEach([100, 75, 50, 25, 0], id: \.self) { normalizedValue in
+
+                                        // ✅ SOLUTION: Remove "0" so lowest label is at 25, staying above X-axis
+                                        // ✅ Use GKI-specific normalized values if type2 is GKI, otherwise generic
+                                        ForEach(isType2GKI ? [100, 66.67, 33.33, 11.11] : [100, 75, 50, 25], id: \.self) { normalizedValue in
+                                                                                    let actualValue = denormalize(Double(normalizedValue), min: range2.min, max: range2.max)
+                                                                                    
+                                                                                    // For GKI, show 9, 6, 3, 1 instead of calculated values
+                                                                                    if isType2GKI {
+                                                                                        let gkiValue = actualValue >= 7.5 ? 9 : (actualValue >= 4.5 ? 6 : (actualValue >= 2.0 ? 3 : 1))
+                                                                                        Text("\(gkiValue)")
+                                                                                            .font(.caption2)
+                                                                                            .foregroundStyle(config2.lineColor)
+                                                                                    } else {
+                                                                                        Text(String(format: "%.0f", actualValue))
+                                                                                            .font(.caption2)
+                                                                                            .foregroundStyle(config2.lineColor)
+                                                                                    }
+                                                                                    
+                                                                                    if normalizedValue != (isType2GKI ? 11.11 : 25) {
+                                                                                        Spacer()
+                                                                                    }
+                                                                                }
+                                                                            }
+                                                                            .frame(height: 240)
+                                                                            .padding(.top, 8)
+                                                                            .padding(.trailing, 8)
+                                                                        }
                                 .padding(.trailing, 16)
                                 
                                 // Axis labels with correct colors
