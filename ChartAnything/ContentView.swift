@@ -118,20 +118,42 @@ struct ContentView: View {
         /// Track customization settings for each measurement type
         @State private var chartCustomizations: [UUID: ChartCustomization] = [:]
         /// Currently customizing this measurement type
-    @State private var customizingType: MeasurementType?
-            /// Track which measurement type is selected for quick-add
-            @State private var selectedMeasurementTypeForQuickAdd: MeasurementType?
-            /// Controls whether the QuickAdd sheet is shown
-            @State private var showingQuickAdd = false
-            /// Track which tab is currently selected (0=Charts, 1=Add Data, 2=Settings)
-            @State private var selectedTab = 0
+        @State private var customizingType: MeasurementType?
+        /// Track which measurement type is selected for quick-add
+        @State private var selectedMeasurementTypeForQuickAdd: MeasurementType?
+        /// Controls whether the QuickAdd sheet is shown
+        @State private var showingQuickAdd = false
+        /// Track which tab is currently selected (0=Charts, 1=Add Data, 2=Settings)
+        @State private var selectedTab = 0
+    /// Whether to persist custom date range across app launches
+            @State private var persistDateRange = UserDefaults.standard.bool(forKey: "persistDateRange")
             /// Selected date range filter
-            @State private var selectedDateFilter: DateRangeFilter = .allTime
+            @State private var selectedDateFilter: DateRangeFilter = {
+                if UserDefaults.standard.bool(forKey: "persistDateRange"),
+                   let saved = UserDefaults.standard.string(forKey: "selectedDateFilter"),
+                   let filter = DateRangeFilter(rawValue: saved) {
+                    return filter
+                }
+                return .allTime
+            }()
             /// Custom start date for filtering
-            @State private var customStartDate: Date = Date()
+            @State private var customStartDate: Date = {
+                if UserDefaults.standard.bool(forKey: "persistDateRange"),
+                   let saved = UserDefaults.standard.object(forKey: "customStartDate") as? Date {
+                    return saved
+                }
+                return Date()
+            }()
             /// Custom end date for filtering
-        @State private var customEndDate: Date = Date()
-        /// Show date range picker sheet
+            @State private var customEndDate: Date = {
+                if UserDefaults.standard.bool(forKey: "persistDateRange"),
+                   let saved = UserDefaults.standard.object(forKey: "customEndDate") as? Date {
+                    return saved
+                }
+                return Date()
+            }()
+
+            /// Show date range picker sheet
         @State private var showingDateRangePicker = false
         /// Show merged chart view
         @State private var showingMergedChart = false
@@ -248,21 +270,62 @@ struct ContentView: View {
             }
         }
         
-        /// Delete all measurement data
-        private func deleteAllData() {
-            // Delete all measurements
-            for measurement in measurements {
-                modelContext.delete(measurement)
+    /// Delete all measurement data
+            private func deleteAllData() {
+                // Delete all measurements
+                for measurement in measurements {
+                    modelContext.delete(measurement)
+                }
+                
+                // Delete all measurement types
+                for type in measurementTypes {
+                    modelContext.delete(type)
+                }
+                
+                // Save context
+                try? modelContext.save()
             }
             
-            // Delete all measurement types
-            for type in measurementTypes {
-                modelContext.delete(type)
-            }
+    /// Save current date range to UserDefaults
+                    private func saveDateRange() {
+                        print("DEBUG: Saving - Filter: \(selectedDateFilter.rawValue), Start: \(customStartDate), End: \(customEndDate)")
+                        UserDefaults.standard.set(selectedDateFilter.rawValue, forKey: "selectedDateFilter")
+                        UserDefaults.standard.set(customStartDate, forKey: "customStartDate")
+                        UserDefaults.standard.set(customEndDate, forKey: "customEndDate")
+                        UserDefaults.standard.synchronize() // Force immediate write
+                        print("DEBUG: Saved to UserDefaults, filter key = \(UserDefaults.standard.string(forKey: "selectedDateFilter") ?? "nil")")
+                    }
+                
+                /// Clear saved date range from UserDefaults
+                private func clearSavedDateRange() {
+                    UserDefaults.standard.removeObject(forKey: "selectedDateFilter")
+                    UserDefaults.standard.removeObject(forKey: "customStartDate")
+                    UserDefaults.standard.removeObject(forKey: "customEndDate")
+                }
             
-            // Save context
-            try? modelContext.save()
-        }
+    /// Load saved date range from UserDefaults
+                    private func loadDateRange() {
+                        print("DEBUG: loadDateRange called, persistDateRange = \(persistDateRange)")
+                        guard persistDateRange else { return }
+                        
+                        // Load dates FIRST (before filter to avoid triggering saves)
+                        if let startDate = UserDefaults.standard.object(forKey: "customStartDate") as? Date {
+                            print("DEBUG: Loading start date: \(startDate)")
+                            customStartDate = startDate
+                        }
+                        
+                        if let endDate = UserDefaults.standard.object(forKey: "customEndDate") as? Date {
+                            print("DEBUG: Loading end date: \(endDate)")
+                            customEndDate = endDate
+                        }
+                        
+                        // Load filter LAST (after dates are set)
+                        if let filterRaw = UserDefaults.standard.string(forKey: "selectedDateFilter"),
+                           let filter = DateRangeFilter(rawValue: filterRaw) {
+                            print("DEBUG: Loading filter: \(filter.rawValue)")
+                            selectedDateFilter = filter
+                        }
+                    }
         
         // MARK: - Computed Properties
     
@@ -359,12 +422,27 @@ struct ContentView: View {
             }
         }
         .sheet(isPresented: $showingDateRangePicker) {
-            DateRangeFilterView(
-                selectedFilter: $selectedDateFilter,
-                customStartDate: $customStartDate,
-                customEndDate: $customEndDate
-            )
-        }
+                    DateRangeFilterView(
+                        selectedFilter: $selectedDateFilter,
+                        customStartDate: $customStartDate,
+                        customEndDate: $customEndDate
+                    )
+                    .onChange(of: selectedDateFilter) { oldValue, newValue in
+                        if persistDateRange {
+                            saveDateRange()
+                        }
+                    }
+                    .onChange(of: customStartDate) { oldValue, newValue in
+                        if persistDateRange {
+                            saveDateRange()
+                        }
+                    }
+                    .onChange(of: customEndDate) { oldValue, newValue in
+                        if persistDateRange {
+                            saveDateRange()
+                        }
+                    }
+                }
         .sheet(isPresented: $showingMergedChart) {
             MergedChartView()
         }
@@ -406,8 +484,9 @@ struct ContentView: View {
             handleImport(result: result)
         }
         .onAppear {
-            loadCustomizations()
-        }
+                    loadCustomizations()
+                    loadDateRange()
+                }
     }
         
         // MARK: - Charts View Components
@@ -654,27 +733,29 @@ struct ContentView: View {
             selectedTab = 0
         }
             
-            // ┌─────────────────────────────────────────────────────────────┐
-            // │ SETTINGS VIEW (Tab 3)                                        │
-            // │ App settings, export/import, delete data, etc.              │
-            // └─────────────────────────────────────────────────────────────┘
-            private var settingsView: some View {
-                NavigationStack {
-                    VStack(spacing: 20) {
-                        Text("Settings")
-                            .font(.largeTitle)
-                            .bold()
-                            .padding()
-                        
-                        Text("Settings coming soon!")
-                            .foregroundStyle(.secondary)
-                        
-                        Spacer()
+                // ┌─────────────────────────────────────────────────────────────┐
+                // │ SETTINGS VIEW (Tab 3)                                       │
+                // │ App settings, export/import, delete data, etc.              │
+                // └─────────────────────────────────────────────────────────────┘
+                private var settingsView: some View {
+                    NavigationStack {
+                        Form {
+                            Section("Date Range") {
+                                Toggle("Remember custom date range", isOn: $persistDateRange)
+                                    .onChange(of: persistDateRange) { oldValue, newValue in
+                                        UserDefaults.standard.set(newValue, forKey: "persistDateRange")
+                                        if newValue {
+                                            saveDateRange()
+                                        } else {
+                                            clearSavedDateRange()
+                                        }
+                                    }
+                            }
+                        }
+                        .navigationTitle("Settings")
+                        .navigationBarTitleDisplayMode(.inline)
                     }
-                    .navigationTitle("Settings")
-                    .navigationBarTitleDisplayMode(.inline)
                 }
-            }
                                                                 
 // MARK: - Customization Persistence
     

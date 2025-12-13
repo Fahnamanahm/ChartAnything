@@ -104,17 +104,22 @@ struct DateRangeFilterView: View {
                     }
                     
                     if selectedFilter == .custom {
-                        DatePicker("Start Date", selection: $customStartDate, displayedComponents: .date)
-                        DatePicker("End Date", selection: $customEndDate, displayedComponents: .date)
-                        
-                        Button("Apply Custom Range") {
-                            dismiss()
-                        }
-                        .frame(maxWidth: .infinity)
-                    }
-                }
-            }
-            .navigationTitle("Date Range")
+                                            DatePicker("Start Date", selection: $customStartDate, displayedComponents: .date)
+                                            DatePicker("End Date", selection: $customEndDate, displayedComponents: .date)
+                                            
+                                            Button("Apply Custom Range") {
+                                                // Ensure filter is set to custom
+                                                selectedFilter = .custom
+                                                // Small delay to ensure state updates propagate
+                                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                                    dismiss()
+                                                }
+                                            }
+                                            .frame(maxWidth: .infinity)
+                                        }
+                                    }
+                                }
+                                .navigationTitle("Date Range")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
