@@ -15,13 +15,20 @@ class DataManager {
     // │ (cannot be deleted by user)                                 │
     // └─────────────────────────────────────────────────────────────┘
     static func setupInitialData(context: ModelContext) {
+        print("DEBUG: setupInitialData called")
+        
         // Check if we already have data
         let fetchDescriptor = FetchDescriptor<MeasurementType>()
         let existingTypes = try? context.fetch(fetchDescriptor)
         
+        print("DEBUG: Found \(existingTypes?.count ?? 0) existing types")
+        
         if let existingTypes = existingTypes, !existingTypes.isEmpty {
+            print("DEBUG: Data already exists, skipping creation")
             return // Data already exists
         }
+        
+        print("DEBUG: Creating default measurement types")
         
         // ┌─────────────────────────────────────────────────────────┐
         // │ CREATE DEFAULT MEASUREMENT TYPES                        │
@@ -52,7 +59,14 @@ class DataManager {
         context.insert(ketones)
         context.insert(weight)
         
-        try? context.save()
+        print("DEBUG: Inserted 3 types, attempting save")
+        
+        do {
+            try context.save()
+            print("DEBUG: Save successful")
+        } catch {
+            print("DEBUG: Save failed: \(error)")
+        }
     }
     
     // ┌─────────────────────────────────────────────────────────────┐

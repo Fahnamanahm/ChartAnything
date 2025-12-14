@@ -489,66 +489,64 @@ struct ContentView: View {
                 }
     }
         
-        // MARK: - Charts View Components
-        
-        private var chartsScrollView: some View {
-            ScrollView {
-                VStack(spacing: 20) {
-                    chartsHeader
-                    chartsContent
-                }
-                .padding()
-            }
-        }
-        
-        private var chartsHeader: some View {
-            HStack {
-                Text("ChartAnything")
-                    .font(.largeTitle)
-                    .bold()
-                
-                Spacer()
-                
-                Button {
-                    showingDateRangePicker = true
-                } label: {
-                    Image(systemName: "calendar")
-                        .font(.title2)
-                        .foregroundStyle(.blue)
+    // MARK: - Charts View Components
+            
+            private var chartsScrollView: some View {
+                ScrollView {
+                    VStack(spacing: 20) {
+                        chartsHeader
+                        chartsContent
+                    }
+                    .padding()
                 }
             }
-        }
-        
-        private var chartsContent: some View {
-            Group {
-                ForEach(measurementTypes, id: \.id) { type in
-                    if !type.measurements.isEmpty {
-                        chartCard(for: type)
+            
+            private var chartsHeader: some View {
+                HStack {
+                    Text("ChartAnything")
+                        .font(.largeTitle)
+                        .bold()
+                    
+                    Spacer()
+                    
+                    Button {
+                        showingDateRangePicker = true
+                    } label: {
+                        Image(systemName: "calendar")
+                            .font(.title2)
+                            .foregroundStyle(.blue)
                     }
                 }
-                
-                gkiSection
             }
-        }
-        
-        private var gkiSection: some View {
-            GKICalculatorView(
-                startDate: selectedDateFilter.startDate(customStart: customStartDate),
-                endDate: selectedDateFilter.endDate(customEnd: customEndDate)
-            )
-            .background(Color(.systemBackground))
-            .cornerRadius(12)
-            .shadow(radius: 2)
-        }
-        
-        private var chartBackground: some View {
-            LinearGradient(
-                colors: [Color.purple.opacity(0.3), Color.blue.opacity(0.2)],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            .ignoresSafeArea()
-        }
+            
+            private var chartsContent: some View {
+                Group {
+                    ForEach(measurementTypes, id: \.id) { type in
+                        chartCard(for: type)
+                    }
+                    
+                    gkiSection
+                }
+            }
+            
+            private var gkiSection: some View {
+                GKICalculatorView(
+                    startDate: selectedDateFilter.startDate(customStart: customStartDate),
+                    endDate: selectedDateFilter.endDate(customEnd: customEndDate)
+                )
+                .background(Color(.systemBackground))
+                .cornerRadius(12)
+                .shadow(radius: 2)
+            }
+            
+            private var chartBackground: some View {
+                LinearGradient(
+                    colors: [Color.purple.opacity(0.3), Color.blue.opacity(0.2)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                .ignoresSafeArea()
+            }
                 
                 // MARK: - Toolbar Menu Components
                 
