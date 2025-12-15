@@ -32,6 +32,7 @@ struct ChartHeaderView: View {
     let type: MeasurementType
     let onCustomize: () -> Void
     let onAddReading: () -> Void
+    let onViewList: () -> Void  // ✅ New parameter for viewing measurement list
     
     var body: some View {
         HStack {
@@ -40,6 +41,14 @@ struct ChartHeaderView: View {
                 .font(.headline)
             
             Spacer()
+            
+            // ↓↓↓ View list button (list icon)
+            Button(action: onViewList) {
+                Image(systemName: "list.bullet")
+                    .foregroundStyle(.purple)
+                    .font(.title3)
+            }
+            .buttonStyle(.plain)
             
             // ↓↓↓ Customize button (blue sliders icon)
             Button(action: onCustomize) {
@@ -116,16 +125,20 @@ struct ContentView: View {
         /// Controls whether the "Add Measurement Type" sheet is shown
         @State private var showingAddMeasurementType = false
         /// Track customization settings for each measurement type
-        @State private var chartCustomizations: [UUID: ChartCustomization] = [:]
-        /// Currently customizing this measurement type
-        @State private var customizingType: MeasurementType?
-        /// Track which measurement type is selected for quick-add
-        @State private var selectedMeasurementTypeForQuickAdd: MeasurementType?
-        /// Controls whether the QuickAdd sheet is shown
-        @State private var showingQuickAdd = false
-        /// Track which tab is currently selected (0=Charts, 1=Add Data, 2=Settings)
-        @State private var selectedTab = 0
-    /// Whether to persist custom date range across app launches
+    @State private var chartCustomizations: [UUID: ChartCustomization] = [:]
+            /// Currently customizing this measurement type
+            @State private var customizingType: MeasurementType?
+            /// Track which measurement type is selected for quick-add
+            @State private var selectedMeasurementTypeForQuickAdd: MeasurementType?
+            /// Controls whether the QuickAdd sheet is shown
+            @State private var showingQuickAdd = false
+            /// Track which measurement type is selected for viewing list of measurements
+            @State private var selectedMeasurementTypeForList: MeasurementType?
+            /// Controls whether the measurement list sheet is shown
+            @State private var showingMeasurementList = false
+            /// Track which tab is currently selected (0=Charts, 1=Add Data, 2=Settings)
+            @State private var selectedTab = 0
+            /// Whether to persist custom date range across app launches
             @State private var persistDateRange = UserDefaults.standard.bool(forKey: "persistDateRange")
             /// Selected date range filter
             @State private var selectedDateFilter: DateRangeFilter = {
@@ -487,9 +500,12 @@ struct ContentView: View {
             MergedChartView()
         }
         .sheet(item: $selectedMeasurementTypeForQuickAdd) { selectedType in
-                    let _ = print("DEBUG: Showing QuickAdd for \(selectedType.name)")
-                    QuickAddMeasurementView(measurementType: selectedType)
-                }
+                            let _ = print("DEBUG: Showing QuickAdd for \(selectedType.name)")
+                            QuickAddMeasurementView(measurementType: selectedType)
+                        }
+                        .sheet(item: $selectedMeasurementTypeForList) { selectedType in
+                            MeasurementListView(measurementType: selectedType)
+                        }
         .alert("Export Data", isPresented: $showingExportAlert) {
             Button("OK") { }
         } message: {
@@ -668,20 +684,24 @@ struct ContentView: View {
         }
         
     // MARK: - Chart Helper
-                
-                /// Creates a chart card for a measurement type
-                private func chartCard(for type: MeasurementType) -> some View {
-                    let customization = chartCustomizations[type.id] ?? ChartCustomization()
                     
-                    return VStack(alignment: .leading, spacing: 8) {
-                        ChartHeaderView(
-                            type: type,
-                            onCustomize: { customizingType = type },
-                            onAddReading: {
-                                selectedMeasurementTypeForQuickAdd = type
-                                showingQuickAdd = true
-                            }
-                        )
+                    /// Creates a chart card for a measurement type
+                    private func chartCard(for type: MeasurementType) -> some View {
+                        let customization = chartCustomizations[type.id] ?? ChartCustomization()
+                        
+                        return VStack(alignment: .leading, spacing: 8) {
+                            ChartHeaderView(
+                                type: type,
+                                onCustomize: { customizingType = type },
+                                onAddReading: {
+                                    selectedMeasurementTypeForQuickAdd = type
+                                    showingQuickAdd = true
+                                },
+                                onViewList: {
+                                    selectedMeasurementTypeForList = type
+                                    showingMeasurementList = true
+                                }
+                            )
                         
                         ChartView(
                             measurementType: type,
