@@ -594,15 +594,42 @@ struct ContentView: View {
                 }
             }
             
-            private var gkiSection: some View {
+    private var gkiSection: some View {
+            VStack(alignment: .leading, spacing: 8) {
+                // Header with export button
+                HStack {
+                    Text("GKI")
+                        .font(.headline)
+                    
+                    Text("(Glucose-Ketone Index)")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    
+                    Spacer()
+                    
+                    // Export button
+                    Button {
+                        exportGKIChart()
+                    } label: {
+                        Image(systemName: "square.and.arrow.up")
+                            .foregroundStyle(.orange)
+                            .font(.title3)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.horizontal)
+                .padding(.top, 8)
+                
                 GKICalculatorView(
                     startDate: selectedDateFilter.startDate(customStart: customStartDate),
                     endDate: selectedDateFilter.endDate(customEnd: customEndDate)
                 )
-                .background(Color(.systemBackground))
-                .cornerRadius(12)
-                .shadow(radius: 2)
             }
+            .background(Color(.systemBackground))
+            .cornerRadius(12)
+            .shadow(radius: 2)
+        }
+
             
             private var chartBackground: some View {
                 LinearGradient(
@@ -803,75 +830,105 @@ struct ContentView: View {
                 selectedTab = 0
             }
             
-            // ┌─────────────────────────────────────────────────────────────┐
-            // │ EXPORT CHART FUNCTION                                        │
-            // │ Renders chart to image and shows share sheet                │
-            // └─────────────────────────────────────────────────────────────┘
-            private func exportChart(for type: MeasurementType, customization: ChartCustomization) {
-                // Create the chart view to export (without header/buttons)
-                let chartToExport = ChartView(
-                    measurementType: type,
-                    measurements: filteredMeasurements(for: type.measurements),
-                    pointSize: customization.pointSize,
-                    pointColor: customization.pointColor,
-                    showDataPoints: customization.showDataPoints,
-                    showLine: customization.showLine,
-                    lineColor: customization.lineColor,
-                    lineWidth: customization.lineWidth
-                )
-                .frame(width: 1200, height: 800)
-                .background(Color.white)
-                
-                // Render to image
-                                guard let image = chartToExport.asImage() else {
-                                    print("ERROR: Failed to render chart image")
-                                    return
-                                }
-                                
-                
-                // Show share sheet
-                let activityVC = UIActivityViewController(
-                    activityItems: [image],
-                    applicationActivities: nil
-                )
-                
-                // Present share sheet
-                if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-                   let rootVC = windowScene.windows.first?.rootViewController {
-                    rootVC.present(activityVC, animated: true)
-                }
-            }
-            
-                // ┌─────────────────────────────────────────────────────────────┐
-                // │ SETTINGS VIEW (Tab 3)                                       │
-                // │ App settings, export/import, delete data, etc.              │
+    // ┌─────────────────────────────────────────────────────────────┐
+                // │ EXPORT CHART FUNCTION                                        │
+                // │ Renders chart to image and shows share sheet                │
                 // └─────────────────────────────────────────────────────────────┘
-                private var settingsView: some View {
-                    NavigationStack {
-                        Form {
-                            Section("Date Range") {
-                                Toggle("Remember custom date range", isOn: $persistDateRange)
-                                    .onChange(of: persistDateRange) { oldValue, newValue in
-                                        UserDefaults.standard.set(newValue, forKey: "persistDateRange")
-                                        if newValue {
-                                            saveDateRange()
-                                        } else {
-                                            clearSavedDateRange()
-                                        }
-                                    }
-                            }
-                        }
-                        .navigationTitle("Settings")
-                        .navigationBarTitleDisplayMode(.inline)
+                private func exportChart(for type: MeasurementType, customization: ChartCustomization) {
+                    // Create the chart view to export (without header/buttons)
+                    let chartToExport = ChartView(
+                        measurementType: type,
+                        measurements: filteredMeasurements(for: type.measurements),
+                        pointSize: customization.pointSize,
+                        pointColor: customization.pointColor,
+                        showDataPoints: customization.showDataPoints,
+                        showLine: customization.showLine,
+                        lineColor: customization.lineColor,
+                        lineWidth: customization.lineWidth
+                    )
+                    .frame(width: 1200, height: 800)
+                    .background(Color.white)
+                    
+                    // Render to image
+                    guard let image = chartToExport.asImage() else {
+                        print("ERROR: Failed to render chart image")
+                        return
+                    }
+                    
+                    // Show share sheet
+                    presentShareSheet(with: image)
+                }
+                
+                // ┌─────────────────────────────────────────────────────────────┐
+                // │ EXPORT GKI CHART FUNCTION                                    │
+                // │ Renders GKI chart to image and shows share sheet            │
+                // └─────────────────────────────────────────────────────────────┘
+                private func exportGKIChart() {
+                    // Create the GKI chart view to export
+                    let chartToExport = GKICalculatorView(
+                        startDate: selectedDateFilter.startDate(customStart: customStartDate),
+                        endDate: selectedDateFilter.endDate(customEnd: customEndDate)
+                    )
+                    .frame(width: 1200, height: 800)
+                    .background(Color.white)
+                    
+                    // Render to image
+                    guard let image = chartToExport.asImage() else {
+                        print("ERROR: Failed to render GKI chart image")
+                        return
+                    }
+                    
+                    // Show share sheet
+                    presentShareSheet(with: image)
+                }
+                
+                // ┌─────────────────────────────────────────────────────────────┐
+                // │ PRESENT SHARE SHEET HELPER                                   │
+                // │ Shows iOS share sheet with provided image                    │
+                // └─────────────────────────────────────────────────────────────┘
+                private func presentShareSheet(with image: UIImage) {
+                    let activityVC = UIActivityViewController(
+                        activityItems: [image],
+                        applicationActivities: nil
+                    )
+                    
+                    // Present share sheet
+                    if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                       let rootVC = windowScene.windows.first?.rootViewController {
+                        rootVC.present(activityVC, animated: true)
                     }
                 }
-                                                                
-// MARK: - Customization Persistence
-    
-    /// Load saved customizations from database
-    private func loadCustomizations() {
-        for saved in savedCustomizations {
-            chartCustomizations[saved.measurementTypeID] = saved.toChartCustomization()
+                
+                    // ┌─────────────────────────────────────────────────────────────┐
+                    // │ SETTINGS VIEW (Tab 3)                                       │
+                    // │ App settings, export/import, delete data, etc.              │
+                    // └─────────────────────────────────────────────────────────────┘
+                    private var settingsView: some View {
+                        NavigationStack {
+                            Form {
+                                Section("Date Range") {
+                                    Toggle("Remember custom date range", isOn: $persistDateRange)
+                                        .onChange(of: persistDateRange) { oldValue, newValue in
+                                            UserDefaults.standard.set(newValue, forKey: "persistDateRange")
+                                            if newValue {
+                                                saveDateRange()
+                                            } else {
+                                                clearSavedDateRange()
+                                            }
+                                        }
+                                }
+                            }
+                            .navigationTitle("Settings")
+                            .navigationBarTitleDisplayMode(.inline)
+                        }
+                    }
+                                                                    
+    // MARK: - Customization Persistence
+        
+        /// Load saved customizations from database
+        private func loadCustomizations() {
+            for saved in savedCustomizations {
+                chartCustomizations[saved.measurementTypeID] = saved.toChartCustomization()
         }
     }
     
