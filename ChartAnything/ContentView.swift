@@ -208,67 +208,107 @@ struct ContentView: View {
         }
         
     /// Handle CSV import from file picker
-        private func handleImport(result: Result<[URL], Error>) {
-            switch result {
-            case .success(let urls):
-                guard let url = urls.first else { return }
-                
-                let importResult = CSVManager.importFromCSV(
-                    fileURL: url,
-                    context: modelContext,
-                    measurementTypes: measurementTypes
-                )
-                
-                if importResult.errors > 0 {
-                    importMessage = "Import completed with issues:\n\n✓ \(importResult.success) measurements imported\n✗ \(importResult.errors) failed\n\nErrors:\n\(importResult.messages.joined(separator: "\n"))"
-                } else {
-                    importMessage = "Success! Imported \(importResult.success) measurements."
+            private func handleImport(result: Result<[URL], Error>) {
+                switch result {
+                case .success(let urls):
+                    guard let url = urls.first else { return }
+                    
+                    // Store previous filter if it was custom
+                    let previousFilter = selectedDateFilter
+                    let previousStart = customStartDate
+                    let previousEnd = customEndDate
+                    
+                    // Switch to All Time to show imported data
+                    selectedDateFilter = .allTime
+                    
+                    let importResult = CSVManager.importFromCSV(
+                        fileURL: url,
+                        context: modelContext,
+                        measurementTypes: measurementTypes
+                    )
+                    
+                    // Build import message
+                    var message = ""
+                    if importResult.errors > 0 {
+                        message = "Import completed with issues:\n\n✓ \(importResult.success) measurements imported\n✗ \(importResult.errors) failed\n\nErrors:\n\(importResult.messages.joined(separator: "\n"))"
+                    } else {
+                        message = "Success! Imported \(importResult.success) measurements."
+                    }
+                    
+                    // Add filter change warning if user had custom range
+                    if previousFilter == .custom {
+                        let dateFormatter = DateFormatter()
+                        dateFormatter.dateStyle = .medium
+                        message += "\n\n📅 Date filter changed to 'All Time' to display imported data.\n\nYour previous custom range was:\n\(dateFormatter.string(from: previousStart)) - \(dateFormatter.string(from: previousEnd))"
+                    }
+                    
+                    importMessage = message
+                    showingImportAlert = true
+                    
+                case .failure(let error):
+                    importMessage = "Import failed: \(error.localizedDescription)"
+                    showingImportAlert = true
                 }
-                showingImportAlert = true
-                
-            case .failure(let error):
-                importMessage = "Import failed: \(error.localizedDescription)"
-                showingImportAlert = true
             }
-        }
             
     /// Import CSV data from clipboard
-        private func importFromClipboard() {
-            // Get clipboard content
-            guard let clipboardText = UIPasteboard.general.string else {
-                importMessage = "No text found in clipboard"
-                showingImportAlert = true
-                return
-            }
-            
-            // Write to temporary file
-            let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("clipboard_import.csv")
-            
-            do {
-                try clipboardText.write(to: tempURL, atomically: true, encoding: .utf8)
-                
-                // Import from temporary file
-                let importResult = CSVManager.importFromCSV(
-                    fileURL: tempURL,
-                    context: modelContext,
-                    measurementTypes: measurementTypes
-                )
-                
-                if importResult.errors > 0 {
-                    importMessage = "Import completed with issues:\n\n✓ \(importResult.success) measurements imported\n✗ \(importResult.errors) failed\n\nErrors:\n\(importResult.messages.joined(separator: "\n"))"
-                } else {
-                    importMessage = "Success! Imported \(importResult.success) measurements from clipboard!"
+            private func importFromClipboard() {
+                // Get clipboard content
+                guard let clipboardText = UIPasteboard.general.string else {
+                    importMessage = "No text found in clipboard"
+                    showingImportAlert = true
+                    return
                 }
-                showingImportAlert = true
                 
-                // Clean up temp file
-                try? FileManager.default.removeItem(at: tempURL)
+                // Store previous filter if it was custom
+                let previousFilter = selectedDateFilter
+                let previousStart = customStartDate
+                let previousEnd = customEndDate
                 
-            } catch {
-                importMessage = "Failed to process clipboard data: \(error.localizedDescription)"
-                showingImportAlert = true
+                // Switch to All Time to show imported data
+                selectedDateFilter = .allTime
+                
+                // Write to temporary file
+                let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("clipboard_import.csv")
+                
+                do {
+                    try clipboardText.write(to: tempURL, atomically: true, encoding: .utf8)
+                    
+                    // Import from temporary file
+                    let importResult = CSVManager.importFromCSV(
+                        fileURL: tempURL,
+                        context: modelContext,
+                        measurementTypes: measurementTypes
+                    )
+                    
+                    // Build import message
+                    var message = ""
+                    if importResult.errors > 0 {
+                        message = "Import completed with issues:\n\n✓ \(importResult.success) measurements imported\n✗ \(importResult.errors) failed\n\nErrors:\n\(importResult.messages.joined(separator: "\n"))"
+                    } else {
+                        message = "Success! Imported \(importResult.success) measurements from clipboard!"
+                    }
+                    
+                    // Add filter change warning if user had custom range
+                    if previousFilter == .custom {
+                        let dateFormatter = DateFormatter()
+                        dateFormatter.dateStyle = .medium
+                        message += "\n\n📅 Date filter changed to 'All Time' to display imported data.\n\nYour previous custom range was:\n\(dateFormatter.string(from: previousStart)) - \(dateFormatter.string(from: previousEnd))"
+                    } else if previousFilter != .allTime {
+                        message += "\n\n📅 Date filter changed to 'All Time' to display imported data.\n\nYour previous filter was: \(previousFilter.rawValue)"
+                    }
+                    
+                    importMessage = message
+                    showingImportAlert = true
+                    
+                    // Clean up temp file
+                    try? FileManager.default.removeItem(at: tempURL)
+                    
+                } catch {
+                    importMessage = "Failed to process clipboard data: \(error.localizedDescription)"
+                    showingImportAlert = true
+                }
             }
-        }
         
     /// Delete all measurement data
             private func deleteAllData() {
