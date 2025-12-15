@@ -32,7 +32,8 @@ struct ChartHeaderView: View {
     let type: MeasurementType
     let onCustomize: () -> Void
     let onAddReading: () -> Void
-    let onViewList: () -> Void  // ✅ New parameter for viewing measurement list
+    let onViewList: () -> Void
+    let onExport: () -> Void  // ✅ New parameter for exporting chart
     
     var body: some View {
         HStack {
@@ -41,6 +42,14 @@ struct ChartHeaderView: View {
                 .font(.headline)
             
             Spacer()
+            
+            // ↓↓↓ Export button (share icon)
+            Button(action: onExport) {
+                Image(systemName: "square.and.arrow.up")
+                    .foregroundStyle(.orange)
+                    .font(.title3)
+            }
+            .buttonStyle(.plain)
             
             // ↓↓↓ View list button (list icon)
             Button(action: onViewList) {
@@ -684,24 +693,27 @@ struct ContentView: View {
         }
         
     // MARK: - Chart Helper
-                    
-                    /// Creates a chart card for a measurement type
-                    private func chartCard(for type: MeasurementType) -> some View {
-                        let customization = chartCustomizations[type.id] ?? ChartCustomization()
                         
-                        return VStack(alignment: .leading, spacing: 8) {
-                            ChartHeaderView(
-                                type: type,
-                                onCustomize: { customizingType = type },
-                                onAddReading: {
-                                    selectedMeasurementTypeForQuickAdd = type
-                                    showingQuickAdd = true
-                                },
-                                onViewList: {
-                                    selectedMeasurementTypeForList = type
-                                    showingMeasurementList = true
-                                }
-                            )
+                        /// Creates a chart card for a measurement type
+                        private func chartCard(for type: MeasurementType) -> some View {
+                            let customization = chartCustomizations[type.id] ?? ChartCustomization()
+                            
+                            return VStack(alignment: .leading, spacing: 8) {
+                                ChartHeaderView(
+                                    type: type,
+                                    onCustomize: { customizingType = type },
+                                    onAddReading: {
+                                        selectedMeasurementTypeForQuickAdd = type
+                                        showingQuickAdd = true
+                                    },
+                                    onViewList: {
+                                        selectedMeasurementTypeForList = type
+                                        showingMeasurementList = true
+                                    },
+                                    onExport: {
+                                        exportChart(for: type, customization: customization)
+                                    }
+                                )
                         
                         ChartView(
                             measurementType: type,
@@ -778,18 +790,57 @@ struct ContentView: View {
                         }
 
     // Helper function to save measurement and navigate to chart
-        private func saveMeasurement(value: Double, timestamp: Date, notes: String?, type: MeasurementType) {
-            let measurement = Measurement(
-                value: value,
-                timestamp: timestamp,
-                notes: notes?.isEmpty == false ? notes : nil
-            )
-            measurement.measurementType = type
-            modelContext.insert(measurement)
+            private func saveMeasurement(value: Double, timestamp: Date, notes: String?, type: MeasurementType) {
+                let measurement = Measurement(
+                    value: value,
+                    timestamp: timestamp,
+                    notes: notes?.isEmpty == false ? notes : nil
+                )
+                measurement.measurementType = type
+                modelContext.insert(measurement)
+                
+                // Navigate to Charts tab
+                selectedTab = 0
+            }
             
-            // Navigate to Charts tab
-            selectedTab = 0
-        }
+            // ┌─────────────────────────────────────────────────────────────┐
+            // │ EXPORT CHART FUNCTION                                        │
+            // │ Renders chart to image and shows share sheet                │
+            // └─────────────────────────────────────────────────────────────┘
+            private func exportChart(for type: MeasurementType, customization: ChartCustomization) {
+                // Create the chart view to export (without header/buttons)
+                let chartToExport = ChartView(
+                    measurementType: type,
+                    measurements: filteredMeasurements(for: type.measurements),
+                    pointSize: customization.pointSize,
+                    pointColor: customization.pointColor,
+                    showDataPoints: customization.showDataPoints,
+                    showLine: customization.showLine,
+                    lineColor: customization.lineColor,
+                    lineWidth: customization.lineWidth
+                )
+                .frame(width: 1200, height: 800)
+                .background(Color.white)
+                
+                // Render to image
+                                guard let image = chartToExport.asImage() else {
+                                    print("ERROR: Failed to render chart image")
+                                    return
+                                }
+                                
+                
+                // Show share sheet
+                let activityVC = UIActivityViewController(
+                    activityItems: [image],
+                    applicationActivities: nil
+                )
+                
+                // Present share sheet
+                if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                   let rootVC = windowScene.windows.first?.rootViewController {
+                    rootVC.present(activityVC, animated: true)
+                }
+            }
             
                 // ┌─────────────────────────────────────────────────────────────┐
                 // │ SETTINGS VIEW (Tab 3)                                       │
