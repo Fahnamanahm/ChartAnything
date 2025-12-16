@@ -333,20 +333,24 @@ struct ContentView: View {
             }
         
     /// Delete all measurement data
-            private func deleteAllData() {
-                // Delete all measurements
-                for measurement in measurements {
-                    modelContext.delete(measurement)
+                private func deleteAllData() {
+                    // Delete all measurements
+                    for measurement in measurements {
+                        modelContext.delete(measurement)
+                    }
+                    
+                    // Keep default measurement types (Glucose, Ketones, Weight)
+                    // Only delete custom types user created
+                    let defaultTypes = ["Glucose", "Ketones", "Weight"]
+                    for type in measurementTypes {
+                        if !defaultTypes.contains(type.name) {
+                            modelContext.delete(type)
+                        }
+                    }
+                    
+                    // Save context
+                    try? modelContext.save()
                 }
-                
-                // Delete all measurement types
-                for type in measurementTypes {
-                    modelContext.delete(type)
-                }
-                
-                // Save context
-                try? modelContext.save()
-            }
             
     /// Save current date range to UserDefaults
                     private func saveDateRange() {
