@@ -143,29 +143,37 @@ struct ContentView: View {
             @State private var showingQuickAdd = false
             /// Track which measurement type is selected for viewing list of measurements
             @State private var selectedMeasurementTypeForList: MeasurementType?
-            /// Controls whether the measurement list sheet is shown
-            @State private var showingMeasurementList = false
-            /// Track which tab is currently selected (0=Charts, 1=Add Data, 2=Settings)
-            @State private var selectedTab = 0
-            /// Whether to persist custom date range across app launches
-            @State private var persistDateRange = UserDefaults.standard.bool(forKey: "persistDateRange")
-            /// Selected date range filter
-            @State private var selectedDateFilter: DateRangeFilter = {
-                if UserDefaults.standard.bool(forKey: "persistDateRange"),
-                   let saved = UserDefaults.standard.string(forKey: "selectedDateFilter"),
-                   let filter = DateRangeFilter(rawValue: saved) {
-                    return filter
-                }
-                return .allTime
-            }()
-            /// Custom start date for filtering
-            @State private var customStartDate: Date = {
-                if UserDefaults.standard.bool(forKey: "persistDateRange"),
-                   let saved = UserDefaults.standard.object(forKey: "customStartDate") as? Date {
-                    return saved
-                }
-                return Date()
-            }()
+    /// Controls whether the measurement list sheet is shown
+                @State private var showingMeasurementList = false
+                /// Controls whether the export background picker alert is shown
+                @State private var showingExportBackgroundPicker = false
+                /// Temporarily stores measurement type for pending export
+                @State private var pendingExportType: MeasurementType?
+                /// Temporarily stores customization for pending export
+                @State private var pendingExportCustomization: ChartCustomization?
+                /// Tracks if pending export is GKI chart
+                @State private var pendingExportIsGKI = false
+                /// Track which tab is currently selected (0=Charts, 1=Add Data, 2=Settings)
+                @State private var selectedTab = 0
+                /// Whether to persist custom date range across app launches
+                @State private var persistDateRange = UserDefaults.standard.bool(forKey: "persistDateRange")
+                /// Selected date range filter
+                @State private var selectedDateFilter: DateRangeFilter = {
+                    if UserDefaults.standard.bool(forKey: "persistDateRange"),
+                       let saved = UserDefaults.standard.string(forKey: "selectedDateFilter"),
+                       let filter = DateRangeFilter(rawValue: saved) {
+                        return filter
+                    }
+                    return .allTime
+                }()
+                /// Custom start date for filtering
+                @State private var customStartDate: Date = {
+                    if UserDefaults.standard.bool(forKey: "persistDateRange"),
+                       let saved = UserDefaults.standard.object(forKey: "customStartDate") as? Date {
+                        return saved
+                    }
+                    return Date()
+                }()
             /// Custom end date for filtering
             @State private var customEndDate: Date = {
                 if UserDefaults.standard.bool(forKey: "persistDateRange"),
@@ -516,9 +524,28 @@ struct ContentView: View {
                             let _ = print("DEBUG: Showing QuickAdd for \(selectedType.name)")
                             QuickAddMeasurementView(measurementType: selectedType)
                         }
-                        .sheet(item: $selectedMeasurementTypeForList) { selectedType in
-                            MeasurementListView(measurementType: selectedType)
-                        }
+        .sheet(item: $selectedMeasurementTypeForList) { selectedType in
+                                    MeasurementListView(measurementType: selectedType)
+                                }
+                                .alert("Export Background", isPresented: $showingExportBackgroundPicker) {
+                                    Button("White Background") {
+                                        if pendingExportIsGKI {
+                                            performGKIExport(backgroundColor: .white)
+                                        } else {
+                                            performChartExport(backgroundColor: .white)
+                                        }
+                                    }
+                                    Button("Black Background") {
+                                        if pendingExportIsGKI {
+                                            performGKIExport(backgroundColor: .black)
+                                        } else {
+                                            performChartExport(backgroundColor: .black)
+                                        }
+                                    }
+                                    Button("Cancel", role: .cancel) { }
+                                } message: {
+                                    Text("Choose background color for exported chart")
+                                }
         .alert("Export Data", isPresented: $showingExportAlert) {
             Button("OK") { }
         } message: {
@@ -834,57 +861,91 @@ struct ContentView: View {
                 selectedTab = 0
             }
             
-    // ┌─────────────────────────────────────────────────────────────┐
-                // │ EXPORT CHART FUNCTION                                        │
-                // │ Renders chart to image and shows share sheet                │
-                // └─────────────────────────────────────────────────────────────┘
-                private func exportChart(for type: MeasurementType, customization: ChartCustomization) {
-                    // Create the chart view to export (without header/buttons)
-                    let chartToExport = ChartView(
-                        measurementType: type,
-                        measurements: filteredMeasurements(for: type.measurements),
-                        pointSize: customization.pointSize,
-                        pointColor: customization.pointColor,
-                        showDataPoints: customization.showDataPoints,
-                        showLine: customization.showLine,
-                        lineColor: customization.lineColor,
-                        lineWidth: customization.lineWidth
-                    )
-                    .frame(width: 1200, height: 800)
-                    .background(Color.white)
-                    
-                    // Render to image
-                    guard let image = chartToExport.asImage() else {
-                        print("ERROR: Failed to render chart image")
-                        return
+                    // ┌─────────────────────────────────────────────────────────────┐
+                    // │ EXPORT CHART FUNCTION                                       │
+                    // │ Renders chart to image and shows share sheet                │
+                    // │ Shows alert to choose white or black background             │
+                    // └─────────────────────────────────────────────────────────────┘
+                    private func exportChart(for type: MeasurementType, customization: ChartCustomization) {
+                        // Store chart info for later use
+                        pendingExportType = type
+                        pendingExportCustomization = customization
+                        pendingExportIsGKI = false
+                        
+                        // Show background color picker alert
+                        showingExportBackgroundPicker = true
                     }
                     
-                    // Show share sheet
-                    presentShareSheet(with: image)
-                }
+                    // ┌─────────────────────────────────────────────────────────────┐
+                    // │ PERFORM CHART EXPORT WITH CHOSEN BACKGROUND                  │
+                    // │ Actually renders and exports after user picks background    │
+                    // └─────────────────────────────────────────────────────────────┘
+                    private func performChartExport(backgroundColor: Color) {
+                        guard let type = pendingExportType,
+                              let customization = pendingExportCustomization else {
+                            return
+                        }
+                        
+                        // Create the chart view to export (without header/buttons)
+                        let chartToExport = ChartView(
+                            measurementType: type,
+                            measurements: filteredMeasurements(for: type.measurements),
+                            pointSize: customization.pointSize,
+                            pointColor: customization.pointColor,
+                            showDataPoints: customization.showDataPoints,
+                            showLine: customization.showLine,
+                            lineColor: customization.lineColor,
+                            lineWidth: customization.lineWidth
+                        )
+                        .frame(width: 1200, height: 800)
+                        .background(backgroundColor)
+                        
+                        // Render to image
+                        guard let image = chartToExport.asImage() else {
+                            print("ERROR: Failed to render chart image")
+                            return
+                        }
+                        
+                        // Show share sheet
+                        presentShareSheet(with: image)
+                    }
                 
-                // ┌─────────────────────────────────────────────────────────────┐
-                // │ EXPORT GKI CHART FUNCTION                                    │
-                // │ Renders GKI chart to image and shows share sheet            │
-                // └─────────────────────────────────────────────────────────────┘
-                private func exportGKIChart() {
-                    // Create the GKI chart view to export
-                    let chartToExport = GKICalculatorView(
-                        startDate: selectedDateFilter.startDate(customStart: customStartDate),
-                        endDate: selectedDateFilter.endDate(customEnd: customEndDate)
-                    )
-                    .frame(width: 1200, height: 800)
-                    .background(Color.white)
-                    
-                    // Render to image
-                    guard let image = chartToExport.asImage() else {
-                        print("ERROR: Failed to render GKI chart image")
-                        return
+                    // ┌─────────────────────────────────────────────────────────────┐
+                    // │ EXPORT GKI CHART FUNCTION                                   │
+                    // │ Shows background picker alert for GKI chart                 │
+                    // └─────────────────────────────────────────────────────────────┘
+                    private func exportGKIChart() {
+                        // Mark as GKI export
+                        pendingExportIsGKI = true
+                        pendingExportType = nil
+                        pendingExportCustomization = nil
+                        
+                        // Show background color picker alert
+                        showingExportBackgroundPicker = true
                     }
                     
-                    // Show share sheet
-                    presentShareSheet(with: image)
-                }
+                    // ┌─────────────────────────────────────────────────────────────┐
+                    // │ PERFORM GKI EXPORT WITH CHOSEN BACKGROUND                   │
+                    // │ Actually renders and exports after user picks background    │
+                    // └─────────────────────────────────────────────────────────────┘
+                    private func performGKIExport(backgroundColor: Color) {
+                        // Create the GKI chart view to export
+                        let chartToExport = GKICalculatorView(
+                            startDate: selectedDateFilter.startDate(customStart: customStartDate),
+                            endDate: selectedDateFilter.endDate(customEnd: customEndDate)
+                        )
+                        .frame(width: 1200, height: 800)
+                        .background(backgroundColor)
+                        
+                        // Render to image
+                        guard let image = chartToExport.asImage() else {
+                            print("ERROR: Failed to render GKI chart image")
+                            return
+                        }
+                        
+                        // Show share sheet
+                        presentShareSheet(with: image)
+                    }
                 
                 // ┌─────────────────────────────────────────────────────────────┐
                 // │ PRESENT SHARE SHEET HELPER                                   │
