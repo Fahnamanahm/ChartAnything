@@ -880,35 +880,45 @@ struct ContentView: View {
                     // │ PERFORM CHART EXPORT WITH CHOSEN BACKGROUND                  │
                     // │ Actually renders and exports after user picks background    │
                     // └─────────────────────────────────────────────────────────────┘
-                    private func performChartExport(backgroundColor: Color) {
-                        guard let type = pendingExportType,
-                              let customization = pendingExportCustomization else {
-                            return
+    private func performChartExport(backgroundColor: Color) {
+                            guard let type = pendingExportType,
+                                  let customization = pendingExportCustomization else {
+                                return
+                            }
+                            
+                            // Create the chart view to export with title
+                            let chartToExport = VStack(spacing: 0) {
+                                // Title
+                                Text(type.name)
+                                    .font(.title)
+                                    .bold()
+                                    .foregroundColor(backgroundColor == .black ? .white : .black)
+                                    .padding(.top, 20)
+                                
+                                // Chart
+                                ChartView(
+                                    measurementType: type,
+                                    measurements: filteredMeasurements(for: type.measurements),
+                                    pointSize: customization.pointSize,
+                                    pointColor: customization.pointColor,
+                                    showDataPoints: customization.showDataPoints,
+                                    showLine: customization.showLine,
+                                    lineColor: customization.lineColor,
+                                    lineWidth: customization.lineWidth
+                                )
+                            }
+                            .frame(width: 1200, height: 800)
+                            .background(backgroundColor)
+                            
+                            // Render to image
+                            guard let image = chartToExport.asImage() else {
+                                print("ERROR: Failed to render chart image")
+                                return
+                            }
+                            
+                            // Show share sheet
+                            presentShareSheet(with: image)
                         }
-                        
-                        // Create the chart view to export (without header/buttons)
-                        let chartToExport = ChartView(
-                            measurementType: type,
-                            measurements: filteredMeasurements(for: type.measurements),
-                            pointSize: customization.pointSize,
-                            pointColor: customization.pointColor,
-                            showDataPoints: customization.showDataPoints,
-                            showLine: customization.showLine,
-                            lineColor: customization.lineColor,
-                            lineWidth: customization.lineWidth
-                        )
-                        .frame(width: 1200, height: 800)
-                        .background(backgroundColor)
-                        
-                        // Render to image
-                        guard let image = chartToExport.asImage() else {
-                            print("ERROR: Failed to render chart image")
-                            return
-                        }
-                        
-                        // Show share sheet
-                        presentShareSheet(with: image)
-                    }
                 
                     // ┌─────────────────────────────────────────────────────────────┐
                     // │ EXPORT GKI CHART FUNCTION                                   │
@@ -929,23 +939,24 @@ struct ContentView: View {
                     // │ Actually renders and exports after user picks background    │
                     // └─────────────────────────────────────────────────────────────┘
                     private func performGKIExport(backgroundColor: Color) {
-                        // Create the GKI chart view to export
-                        let chartToExport = GKICalculatorView(
-                            startDate: selectedDateFilter.startDate(customStart: customStartDate),
-                            endDate: selectedDateFilter.endDate(customEnd: customEndDate)
-                        )
-                        .frame(width: 1200, height: 800)
-                        .background(backgroundColor)
-                        
-                        // Render to image
-                        guard let image = chartToExport.asImage() else {
-                            print("ERROR: Failed to render GKI chart image")
-                            return
+                            // Create the GKI chart view to export with model context
+                            let chartToExport = GKICalculatorView(
+                                startDate: selectedDateFilter.startDate(customStart: customStartDate),
+                                endDate: selectedDateFilter.endDate(customEnd: customEndDate)
+                            )
+                            .environment(\.modelContext, modelContext)
+                            .frame(width: 1200, height: 800)
+                            .background(backgroundColor)
+                            
+                            // Render to image
+                            guard let image = chartToExport.asImage() else {
+                                print("ERROR: Failed to render GKI chart image")
+                                return
+                            }
+                            
+                            // Show share sheet
+                            presentShareSheet(with: image)
                         }
-                        
-                        // Show share sheet
-                        presentShareSheet(with: image)
-                    }
                 
                 // ┌─────────────────────────────────────────────────────────────┐
                 // │ PRESENT SHARE SHEET HELPER                                   │
